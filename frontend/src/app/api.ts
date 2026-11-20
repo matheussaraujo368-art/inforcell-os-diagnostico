@@ -274,6 +274,8 @@ export const api = {
   get: <T>(caminho: string) => json<T>("GET", caminho),
   post: <T>(caminho: string, corpo?: unknown) => json<T>("POST", caminho, corpo ?? {}),
   patch: <T>(caminho: string, corpo: unknown) => json<T>("PATCH", caminho, corpo),
+  put: <T>(caminho: string, corpo: unknown) => json<T>("PUT", caminho, corpo),
+  delete: <T>(caminho: string) => json<T>("DELETE", caminho),
   /** Para respostas em HTML, como o comprovante da OS. */
   texto: async (caminho: string): Promise<string> => (await enviar("GET", caminho)).text(),
 };
@@ -330,6 +332,34 @@ export async function consultarSaude(): Promise<Saude | null> {
   }
 }
 
+// ---------- Assistente de IA (Configurações) ----------
+
+export interface SituacaoIA {
+  /** "empresa" = chave cadastrada aqui; "servidor" = chave do ambiente; null = sem IA. */
+  origem: "empresa" | "servidor" | null;
+  chaveMascarada: string | null;
+  chaveIlegivel: boolean;
+  servidorTemChave: boolean;
+  modelo: string;
+  modeloPadrao: string;
+  modelosSugeridos: string[];
+}
+
+export interface TesteIA {
+  modelo: string;
+  nomeModelo: string;
+  modelos: string[];
+}
+
+/** Diz se a empresa logada pode usar a IA. Em caso de falha, considera indisponível. */
+export async function iaDisponivel(): Promise<boolean> {
+  try {
+    return (await api.get<{ disponivel: boolean }>("/configuracoes/ia/status")).disponivel;
+  } catch {
+    return false;
+  }
+}
+
 // ---------- Permissões (espelham os perfis da API) ----------
 
 const perfilEh = (...perfis: Perfil[]): boolean => {
@@ -345,4 +375,5 @@ export const pode = {
   diagnosticar: () => perfilEh("ADMIN", "TECNICO"),
   registrarReparo: () => perfilEh("ADMIN", "TECNICO"),
   gerirEquipe: () => perfilEh("ADMIN"),
+  configurar: () => perfilEh("ADMIN"),
 };

@@ -50,6 +50,10 @@ export function caixaErro(erro) {
     return h("div", { class: "alerta alerta--erro", role: "alert" }, h("p", {}, mensagem), detalhes.length > 0 && h("ul", {}, detalhes.map((d) => h("li", {}, d))));
 }
 export const caixaAviso = (texto) => h("div", { class: "alerta alerta--aviso", role: "status" }, texto);
+/** Aviso de IA indisponível; para o administrador, inclui o link para configurar. */
+export function avisoIAIndisponivel(ehAdmin, complemento = "") {
+    return h("div", { class: "alerta alerta--aviso", role: "status" }, "O assistente de IA ainda não está configurado nesta empresa. ", ehAdmin ? h("a", { href: "#/configuracoes" }, "Cadastrar a chave da IA") : "Peça ao administrador para cadastrar a chave em Configurações.", complemento && ` ${complemento}`);
+}
 export const caixaOk = (texto) => h("div", { class: "alerta alerta--ok", role: "status" }, texto);
 export function campo(o) {
     const comuns = { name: o.nome, required: o.obrigatorio, ...o.atributos };

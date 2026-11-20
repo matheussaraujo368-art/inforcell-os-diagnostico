@@ -73,3 +73,36 @@ Content-Type: application/json
 ### Painel
 GET {{base}}/dashboard
 Authorization: Bearer {{tec}}
+
+### ----- Administrador: chave da IA (Configurações) -----
+# @name loginAdm
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{ "email": "admin@inforcell.local", "senha": "inforcell123" }
+
+###
+@adm = {{loginAdm.response.body.token}}
+
+### Situação da IA (chave aparece mascarada)
+GET {{base}}/configuracoes/ia
+Authorization: Bearer {{adm}}
+
+### Salvar e testar chave + modelo (NÃO faça commit com a chave preenchida)
+PUT {{base}}/configuracoes/ia
+Authorization: Bearer {{adm}}
+Content-Type: application/json
+
+{ "chave": "sk-ant-COLE-AQUI", "modelo": "claude-sonnet-5-5" }
+
+### Testar a configuração atual
+POST {{base}}/configuracoes/ia/testar
+Authorization: Bearer {{adm}}
+
+### Remover a chave da empresa
+DELETE {{base}}/configuracoes/ia/chave
+Authorization: Bearer {{adm}}
+
+### Qualquer perfil: a IA está disponível?
+GET {{base}}/configuracoes/ia/status
+Authorization: Bearer {{tec}}

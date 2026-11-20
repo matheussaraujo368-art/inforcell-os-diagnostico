@@ -1,17 +1,22 @@
 /** HU08 — Painel da empresa: situação das Ordens de Serviço. */
-import { api, Cliente, empresaAtual, Pagina, Painel, pode, StatusOS } from "../api.js";
-import { cabecalhoTela, h, preencher, ROTULO_STATUS, tagStatus } from "../dom.js";
+import { api, Cliente, empresaAtual, iaDisponivel, Pagina, Painel, pode, StatusOS } from "../api.js";
+import { avisoIAIndisponivel, cabecalhoTela, h, preencher, ROTULO_STATUS, tagStatus } from "../dom.js";
 
 const indicador = (rotulo: string, valor: number, destaque = false): HTMLElement =>
   h("div", { class: `indicador${destaque && valor > 0 ? " indicador--alerta" : ""}` }, h("span", { class: "indicador__valor" }, valor), h("span", { class: "indicador__rotulo" }, rotulo));
 
 export async function telaPainel(el: HTMLElement): Promise<void> {
-  const [p, clientes] = await Promise.all([api.get<Painel>("/dashboard"), api.get<Pagina<Cliente>>("/clientes?porPagina=1")]);
+  const [p, clientes, ia] = await Promise.all([
+    api.get<Painel>("/dashboard"),
+    api.get<Pagina<Cliente>>("/clientes?porPagina=1"),
+    pode.diagnosticar() ? iaDisponivel() : Promise.resolve(true),
+  ]);
   const semClientes = clientes.total === 0;
 
   preencher(
     el,
     cabecalhoTela(empresaAtual()?.nome ?? "Painel", pode.abrirOS() && h("a", { class: "btn btn--primary btn--sm", href: "#/ordens/nova" }, "Nova OS")),
+    !ia && avisoIAIndisponivel(pode.configurar()),
     semClientes && pode.cadastrar() && primeirosPassos(),
     h(
       "div",
@@ -59,6 +64,7 @@ function primeirosPassos(): HTMLElement {
     h(
       "ol",
       { class: "passos" },
+      pode.configurar() && h("li", {}, h("a", { href: "#/configuracoes" }, "Cadastre a chave da IA"), " para usar o diagnóstico guiado."),
       pode.gerirEquipe() && h("li", {}, h("a", { href: "#/equipe" }, "Adicione sua equipe"), " (atendentes e técnicos)."),
       h("li", {}, h("a", { href: "#/clientes" }, "Cadastre um cliente"), " e o equipamento dele."),
       h("li", {}, h("a", { href: "#/ordens/nova" }, "Abra a primeira Ordem de Serviço"), "."),

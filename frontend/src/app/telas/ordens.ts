@@ -2,7 +2,7 @@
 import {
   api,
   Cliente,
-  consultarSaude,
+  iaDisponivel,
   Equipamento,
   OrdemDetalhe,
   OrdemResumo,
@@ -15,6 +15,7 @@ import {
 import {
   aoEnviar,
   cabecalhoTela,
+  avisoIAIndisponivel,
   caixaAviso,
   caixaOk,
   campo,
@@ -245,7 +246,7 @@ export async function telaOrdem(el: HTMLElement, { params }: ContextoTela): Prom
     const [os, tecnicos, saude] = await Promise.all([
       api.get<OrdemDetalhe>(`/ordens/${id}`),
       pode.atribuirTecnico() ? api.get<{ id: number; nome: string }[]>("/usuarios/tecnicos") : Promise.resolve([]),
-      pode.diagnosticar() ? consultarSaude() : Promise.resolve(null),
+      pode.diagnosticar() ? iaDisponivel() : Promise.resolve(false),
     ]);
 
     const areaErroComprovante = h("div", {});
@@ -280,7 +281,7 @@ export async function telaOrdem(el: HTMLElement, { params }: ContextoTela): Prom
           { class: "colunas__lado" },
           secaoStatus(os, carregar),
           secaoTecnico(os, tecnicos, carregar),
-          secaoAssistente(os, saude?.ia ?? false),
+          secaoAssistente(os, saude),
         ),
       ),
     );
@@ -551,7 +552,7 @@ function secaoAssistente(os: OrdemDetalhe, iaAtiva: boolean): HTMLElement {
       );
       inicio = form;
     } else {
-      inicio = caixaAviso("O assistente de IA não está disponível: defina ANTHROPIC_API_KEY no servidor para usá-lo.");
+      inicio = avisoIAIndisponivel(pode.configurar());
     }
   }
 

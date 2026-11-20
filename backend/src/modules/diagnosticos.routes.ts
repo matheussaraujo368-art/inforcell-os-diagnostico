@@ -19,7 +19,10 @@ export const diagnosticosRoutes = Router();
 const soTecnico = autorizar("TECNICO", "ADMIN");
 
 async function contextoDaOS(osId: number, sintoma: string): Promise<ContextoDiagnostico> {
-  const os = await prisma.ordemServico.findUniqueOrThrow({ where: { id: osId }, include: { equipamento: true } });
+  const os = await prisma.ordemServico.findUniqueOrThrow({
+    where: { id: osId },
+    include: { equipamento: true, empresa: { select: { nome: true } } },
+  });
   const eq = os.equipamento;
   const anteriores = await prisma.sessaoDiagnostico.findMany({
     where: { os: { equipamentoId: eq.id }, status: "CONCLUIDA", diagnosticoFinal: { not: null } },
@@ -28,6 +31,7 @@ async function contextoDaOS(osId: number, sintoma: string): Promise<ContextoDiag
     select: { sintoma: true, diagnosticoFinal: true, concluidaEm: true },
   });
   return {
+    nomeEmpresa: os.empresa.nome,
     equipamento: { tipo: eq.tipo, marca: eq.marca, modelo: eq.modelo },
     defeitoRelatado: os.defeitoRelatado,
     sintoma,
@@ -86,7 +90,7 @@ diagnosticosRoutes.post("/ordens/:osId/diagnosticos", soTecnico, async (req, res
 
   // Consulta a IA antes de gravar para não deixar sessões vazias em caso de falha.
   const ctx = await contextoDaOS(os.id, sintoma);
-  const resposta = await consultarIA(ctx, []);
+  const resposta = await consultarIA(ctx, [], u.empresaId);
 
   const sessao = await prisma.$transaction(async (tx) => {
     // técnico que inicia o diagnóstico assume a OS e ela avança para EM_DIAGNOSTICO
@@ -161,7 +165,7 @@ diagnosticosRoutes.post("/diagnosticos/:id/mensagens", soTecnico, async (req, re
   ]);
 
   try {
-    const resposta = await consultarIA(await contextoDaOS(sessao.osId, sessao.sintoma), await turnosDaSessao(sessao.id));
+    const resposta = await consultarIA(await contextoDaOS(sessao.osId, sessao.sintoma), await turnosDaSessao(sessao.id), u.empresaId);
     const msgIA = await salvarRespostaIA(sessao.id, resposta, medicaoCriada?.id);
     res.status(201).json({ mensagemTecnico: msgTecnico, medicao: medicaoCriada, mensagemIA: msgIA, orientacao: resposta });
   } catch (e) {
@@ -177,7 +181,7 @@ diagnosticosRoutes.post("/diagnosticos/:id/continuar", soTecnico, async (req, re
   const u = usuarioAtual(req);
   const sessao = await carregarSessao(parseId(req.params.id), u);
   if (sessao.status !== "ATIVA") throw new AppError(409, "Esta sessão de diagnóstico já foi concluída.");
-  const resposta = await consultarIA(await contextoDaOS(sessao.osId, sessao.sintoma), await turnosDaSessao(sessao.id));
+  const resposta = await consultarIA(await contextoDaOS(sessao.osId, sessao.sintoma), await turnosDaSessao(sessao.id), u.empresaId);
   const ultimaMedicao = await prisma.medicao.findFirst({ where: { sessaoId: sessao.id }, orderBy: { id: "desc" } });
   const msgIA = await salvarRespostaIA(sessao.id, resposta, ultimaMedicao?.id);
   res.status(201).json({ mensagemIA: msgIA, orientacao: resposta });

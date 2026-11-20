@@ -56,7 +56,7 @@ src/
   server.ts              inicialização
   config/env.ts          variáveis de ambiente validadas
   middlewares/           autenticação JWT, controle de perfil, tratamento de erros
-  modules/               rotas por recurso (auth, usuarios, clientes, equipamentos, ordens, diagnosticos, conhecimento, dashboard)
+  modules/               rotas por recurso (auth, usuarios, clientes, equipamentos, ordens, diagnosticos, conhecimento, dashboard, configuracoes)
   services/
     statusOS.ts          fluxo de status da OS (Seção 14 do Documento Técnico)
     ia.service.ts        integração com a API da Anthropic, prompt e sanitização de dados pessoais
@@ -186,6 +186,17 @@ Como a IA é usada:
 | Método | Rota | Descrição |
 |---|---|---|
 | GET | `/api/dashboard` | OS por status, em aberto, atrasadas, últimos 30 dias e OS abertas por técnico (HU08) |
+
+### Configurações — assistente de IA
+Cada empresa cadastra a própria chave da Anthropic. A chave é testada antes de salvar, fica criptografada (AES-256-GCM, com `CHAVE_CRIPTOGRAFIA` ou `JWT_SECRET`) e nunca volta inteira para o navegador. Sem chave da empresa, vale a `ANTHROPIC_API_KEY` do servidor.
+
+| Método | Rota | Perfil | Descrição |
+|---|---|---|---|
+| GET | `/api/configuracoes/ia/status` | todos | `{ disponivel }`: a empresa pode usar a IA? |
+| GET | `/api/configuracoes/ia` | ADMIN | origem da chave (`empresa`/`servidor`/`null`), chave mascarada e modelo |
+| PUT | `/api/configuracoes/ia` | ADMIN | `{ chave?, modelo? }`: testa na Anthropic e salva |
+| POST | `/api/configuracoes/ia/testar` | ADMIN | testa a configuração atual (sem gastar créditos) |
+| DELETE | `/api/configuracoes/ia/chave` | ADMIN | remove a chave da empresa |
 
 ---
 

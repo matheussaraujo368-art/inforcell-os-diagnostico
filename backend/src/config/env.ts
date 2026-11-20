@@ -10,6 +10,8 @@ const schema = z.object({
   JWT_EXPIRES_IN: z.string().default("8h"),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-5-5"),
+  /** Segredo usado para criptografar as chaves de IA das empresas. Sem ele, usa o JWT_SECRET. */
+  CHAVE_CRIPTOGRAFIA: z.string().min(32, "CHAVE_CRIPTOGRAFIA deve ter ao menos 32 caracteres").optional(),
 });
 
 export const env = schema.parse(process.env);

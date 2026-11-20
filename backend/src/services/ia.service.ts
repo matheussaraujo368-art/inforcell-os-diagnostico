@@ -1,7 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { env } from "../config/env";
+import { prisma } from "../lib/prisma";
 import { AppError } from "../utils/http";
+import { decifrar } from "./cripto";
 
 /**
  * Serviço de Inteligência Artificial — diagnóstico guiado (Seção 9 do Documento Técnico).
@@ -46,6 +48,8 @@ export const respostaIASchema = z.object({
 export type RespostaIA = z.infer<typeof respostaIASchema>;
 
 export interface ContextoDiagnostico {
+  /** Nome da assistência técnica (não é dado do cliente). */
+  nomeEmpresa?: string;
   equipamento: { tipo: string; marca: string; modelo: string };
   defeitoRelatado: string;
   sintoma: string;
@@ -58,8 +62,16 @@ export interface TurnoConversa {
   texto: string;
 }
 
+/** Chave e modelo usados numa consulta. */
+export interface ConfigIA {
+  apiKey: string;
+  modelo: string;
+  /** "empresa" = chave cadastrada em Configurações; "servidor" = ANTHROPIC_API_KEY do ambiente. */
+  origem: "empresa" | "servidor";
+}
+
 /** Função que efetivamente consulta o modelo. Pode ser substituída nos testes. */
-export type ClienteIA = (system: string, mensagens: Anthropic.MessageParam[]) => Promise<unknown>;
+export type ClienteIA = (system: string, mensagens: Anthropic.MessageParam[], config: ConfigIA) => Promise<unknown>;
 
 // ---------- Privacidade (RNF04 / LGPD) ----------
 
@@ -73,7 +85,8 @@ export function sanitizarTexto(texto: string): string {
 
 // ---------- Prompt ----------
 
-export const SYSTEM_PROMPT = `Você é o assistente de diagnóstico da Inforcell, uma assistência técnica de celulares e computadores em Balsas/MA.
+export function montarSystemPrompt(nomeEmpresa = "Inforcell"): string {
+  return `Você é o assistente de diagnóstico da ${nomeEmpresa.trim() || "Inforcell"}, uma assistência técnica de celulares e computadores.
 Seu papel é conduzir um técnico de eletrônica por um diagnóstico estruturado, um teste de cada vez, até a causa provável do defeito.
 
 Regras:
@@ -87,6 +100,9 @@ Regras:
 - Marque diagnosticoConcluido=true somente quando os testes já apontarem uma causa com boa confiança, e descreva-a em diagnosticoSugerido.
 - Você apoia a decisão do técnico; a decisão final é dele.
 - Use sempre a ferramenta registrar_orientacao para responder.`;
+}
+
+export const SYSTEM_PROMPT = montarSystemPrompt();
 
 const FERRAMENTA: Anthropic.Tool = {
   name: "registrar_orientacao",
@@ -188,18 +204,74 @@ export function resumoParaHistorico(r: RespostaIA): string {
   return linhas.join("\n");
 }
 
+// ---------- Chave e modelo de cada empresa ----------
+
+/** Modelos sugeridos na tela de Configurações (a lista real vem da API, quando há chave). */
+export const MODELOS_SUGERIDOS = ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5"];
+
+/**
+ * Descobre qual chave usar: a da empresa (Configurações) tem prioridade; sem ela, a do servidor.
+ * Devolve null quando não há nenhuma chave utilizável.
+ */
+export async function configIADaEmpresa(empresaId: number): Promise<ConfigIA | null> {
+  const empresa = await prisma.empresa.findUnique({ where: { id: empresaId }, select: { iaChaveCifrada: true, iaModelo: true } });
+  const modelo = empresa?.iaModelo || env.ANTHROPIC_MODEL;
+  const chaveEmpresa = empresa?.iaChaveCifrada ? decifrar(empresa.iaChaveCifrada) : null;
+  if (chaveEmpresa) return { apiKey: chaveEmpresa, modelo, origem: "empresa" };
+  if (env.ANTHROPIC_API_KEY) return { apiKey: env.ANTHROPIC_API_KEY, modelo, origem: "servidor" };
+  return null;
+}
+
 // ---------- Cliente real (API da Anthropic) ----------
 
-let anthropic: Anthropic | null = null;
+const clientes = new Map<string, Anthropic>();
 
-const clienteAnthropic: ClienteIA = async (system, mensagens) => {
-  if (!env.ANTHROPIC_API_KEY) {
-    throw new AppError(503, "Serviço de IA não configurado. Defina ANTHROPIC_API_KEY no arquivo .env.");
+/** Um cliente por chave, reaproveitado entre as consultas. */
+export function clienteDaChave(apiKey: string): Anthropic {
+  let c = clientes.get(apiKey);
+  if (!c) {
+    if (clientes.size >= 50) clientes.clear(); // evita acumular chaves trocadas
+    c = new Anthropic({ apiKey, timeout: 60_000, maxRetries: 2 });
+    clientes.set(apiKey, c);
   }
-  anthropic ??= new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, timeout: 60_000, maxRetries: 2 });
+  return c;
+}
+
+/** Converte erros da Anthropic em mensagens que o técnico ou o administrador entendem. */
+export function traduzirErroIA(e: unknown, modelo: string): AppError {
+  if (e instanceof AppError) return e;
+  if (e instanceof Anthropic.AuthenticationError) {
+    return new AppError(503, "A chave de IA foi recusada pela Anthropic (inválida ou revogada). O administrador pode trocá-la em Configurações.");
+  }
+  if (e instanceof Anthropic.PermissionDeniedError) {
+    return new AppError(503, "A chave de IA não tem permissão para usar este recurso. Confira a conta em console.anthropic.com.");
+  }
+  if (e instanceof Anthropic.NotFoundError) {
+    return new AppError(503, `O modelo "${modelo}" não foi encontrado para esta chave. Escolha outro em Configurações.`);
+  }
+  if (e instanceof Anthropic.RateLimitError) {
+    return new AppError(429, "Limite de uso da IA atingido. Aguarde um minuto e tente de novo.");
+  }
+  if (e instanceof Anthropic.BadRequestError && /credit balance/i.test(e.message)) {
+    return new AppError(503, "A conta da Anthropic está sem créditos. Adicione créditos em console.anthropic.com > Billing.");
+  }
+  if (e instanceof Anthropic.APIConnectionError) {
+    return new AppError(502, "Não foi possível falar com o serviço de IA (sem resposta). Tente novamente em instantes.");
+  }
+  if (e instanceof Anthropic.APIError) {
+    console.error("[IA] erro da API:", e.status, e.message);
+    return e.status === 529
+      ? new AppError(503, "O serviço de IA está sobrecarregado no momento. Tente novamente em instantes.")
+      : new AppError(502, "Falha ao consultar o serviço de IA. Tente novamente em instantes.");
+  }
+  console.error("[IA] erro inesperado:", e);
+  return new AppError(502, "Falha ao consultar o serviço de IA. Tente novamente em instantes.");
+}
+
+const clienteAnthropic: ClienteIA = async (system, mensagens, config) => {
   try {
-    const resp = await anthropic.messages.create({
-      model: env.ANTHROPIC_MODEL,
+    const resp = await clienteDaChave(config.apiKey).messages.create({
+      model: config.modelo,
       max_tokens: 2048,
       system,
       tools: [FERRAMENTA],
@@ -210,14 +282,27 @@ const clienteAnthropic: ClienteIA = async (system, mensagens) => {
     if (!bloco || bloco.type !== "tool_use") throw new AppError(502, "A IA não retornou uma orientação estruturada.");
     return bloco.input;
   } catch (e) {
-    if (e instanceof AppError) throw e;
-    if (e instanceof Anthropic.APIError) {
-      console.error("[IA] erro da API:", e.status, e.message);
-      throw new AppError(502, "Falha ao consultar o serviço de IA. Tente novamente em instantes.");
-    }
-    throw e;
+    throw traduzirErroIA(e, config.modelo);
   }
 };
+
+/**
+ * Confere se a chave funciona e se o modelo existe, sem gastar créditos (consulta a lista de
+ * modelos). Devolve o nome de exibição do modelo e os modelos disponíveis para a chave.
+ */
+export async function testarChave(apiKey: string, modelo: string): Promise<{ modelo: string; nomeModelo: string; modelos: string[] }> {
+  const c = clienteDaChave(apiKey);
+  try {
+    const info = await c.models.retrieve(modelo);
+    const modelos: string[] = [];
+    for await (const m of c.models.list({ limit: 100 })) {
+      if (m.lifecycle !== "retired") modelos.push(m.id);
+    }
+    return { modelo: info.id, nomeModelo: info.display_name, modelos };
+  } catch (e) {
+    throw traduzirErroIA(e, modelo);
+  }
+}
 
 let clienteAtual: ClienteIA = clienteAnthropic;
 
@@ -226,8 +311,22 @@ export function definirClienteIA(c: ClienteIA | null) {
   clienteAtual = c ?? clienteAnthropic;
 }
 
-export async function consultarIA(ctx: ContextoDiagnostico, turnos: TurnoConversa[]): Promise<RespostaIA> {
-  const bruto = await clienteAtual(SYSTEM_PROMPT, montarMensagens(ctx, turnos));
+/** True quando a IA pode ser usada pela empresa (ou quando um cliente simulado está ativo). */
+export async function iaDisponivel(empresaId: number): Promise<boolean> {
+  return clienteAtual !== clienteAnthropic || (await configIADaEmpresa(empresaId)) !== null;
+}
+
+export const MENSAGEM_IA_NAO_CONFIGURADA =
+  "O assistente de IA não está configurado. O administrador da empresa pode cadastrar a chave da Anthropic em Configurações.";
+
+export async function consultarIA(ctx: ContextoDiagnostico, turnos: TurnoConversa[], empresaId?: number): Promise<RespostaIA> {
+  let config: ConfigIA = { apiKey: "", modelo: env.ANTHROPIC_MODEL, origem: "servidor" };
+  if (clienteAtual === clienteAnthropic) {
+    const encontrada = empresaId ? await configIADaEmpresa(empresaId) : null;
+    if (!encontrada && !env.ANTHROPIC_API_KEY) throw new AppError(503, MENSAGEM_IA_NAO_CONFIGURADA);
+    config = encontrada ?? { apiKey: env.ANTHROPIC_API_KEY as string, modelo: env.ANTHROPIC_MODEL, origem: "servidor" };
+  }
+  const bruto = await clienteAtual(montarSystemPrompt(ctx.nomeEmpresa), montarMensagens(ctx, turnos), config);
   const r = respostaIASchema.safeParse(bruto);
   if (!r.success) {
     console.error("[IA] resposta fora do formato:", r.error.issues);

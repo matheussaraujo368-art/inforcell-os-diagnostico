@@ -87,6 +87,8 @@ export const api = {
     get: (caminho) => json("GET", caminho),
     post: (caminho, corpo) => json("POST", caminho, corpo ?? {}),
     patch: (caminho, corpo) => json("PATCH", caminho, corpo),
+    put: (caminho, corpo) => json("PUT", caminho, corpo),
+    delete: (caminho) => json("DELETE", caminho),
     /** Para respostas em HTML, como o comprovante da OS. */
     texto: async (caminho) => (await enviar("GET", caminho)).text(),
 };
@@ -128,6 +130,15 @@ export async function consultarSaude() {
         return null;
     }
 }
+/** Diz se a empresa logada pode usar a IA. Em caso de falha, considera indisponível. */
+export async function iaDisponivel() {
+    try {
+        return (await api.get("/configuracoes/ia/status")).disponivel;
+    }
+    catch {
+        return false;
+    }
+}
 // ---------- Permissões (espelham os perfis da API) ----------
 const perfilEh = (...perfis) => {
     const u = usuarioAtual();
@@ -141,4 +152,5 @@ export const pode = {
     diagnosticar: () => perfilEh("ADMIN", "TECNICO"),
     registrarReparo: () => perfilEh("ADMIN", "TECNICO"),
     gerirEquipe: () => perfilEh("ADMIN"),
+    configurar: () => perfilEh("ADMIN"),
 };

@@ -62,6 +62,17 @@ export function caixaErro(erro: unknown): HTMLElement {
 export const caixaAviso = (texto: string): HTMLElement =>
   h("div", { class: "alerta alerta--aviso", role: "status" }, texto);
 
+/** Aviso de IA indisponível; para o administrador, inclui o link para configurar. */
+export function avisoIAIndisponivel(ehAdmin: boolean, complemento = ""): HTMLElement {
+  return h(
+    "div",
+    { class: "alerta alerta--aviso", role: "status" },
+    "O assistente de IA ainda não está configurado nesta empresa. ",
+    ehAdmin ? h("a", { href: "#/configuracoes" }, "Cadastrar a chave da IA") : "Peça ao administrador para cadastrar a chave em Configurações.",
+    complemento && ` ${complemento}`,
+  );
+}
+
 export const caixaOk = (texto: string): HTMLElement => h("div", { class: "alerta alerta--ok", role: "status" }, texto);
 
 // ---------- Formulários ----------

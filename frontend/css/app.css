@@ -234,3 +234,8 @@ a.lista-status__link:hover { background: var(--surface-2); }
   .dados dd { margin-bottom: 8px; }
   .painel { padding: 16px; }
 }
+
+/* ---------- Configurações ---------- */
+.mono { font-family: var(--font-mono); font-size: 0.86rem; overflow-wrap: anywhere; }
+.lista-simples { list-style: disc; padding-left: 20px; display: grid; gap: 6px; font-size: 0.9rem; color: var(--muted); }
+.config-acoes { margin-top: 14px; flex-wrap: wrap; }

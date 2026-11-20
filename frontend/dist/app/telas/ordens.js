@@ -1,6 +1,6 @@
 /** HU03/HU04 — Lista, abertura e acompanhamento das Ordens de Serviço. */
-import { api, consultarSaude, pode, usuarioAtual, } from "../api.js";
-import { aoEnviar, cabecalhoTela, caixaAviso, caixaOk, campo, data, dataHora, dataParaIso, h, isoParaData, moeda, numeroOS, ocupado, ouNulo, paginador, paraNumero, preencher, ROTULO_STATUS, tagStatus, } from "../dom.js";
+import { api, iaDisponivel, pode, usuarioAtual, } from "../api.js";
+import { aoEnviar, cabecalhoTela, avisoIAIndisponivel, caixaAviso, caixaOk, campo, data, dataHora, dataParaIso, h, isoParaData, moeda, numeroOS, ocupado, ouNulo, paginador, paraNumero, preencher, ROTULO_STATUS, tagStatus, } from "../dom.js";
 import { definirAviso, hashComFiltros, irPara } from "../nav.js";
 // ---------- Lista ----------
 export async function telaOrdens(el, { consulta }) {
@@ -126,7 +126,7 @@ export async function telaOrdem(el, { params }) {
         const [os, tecnicos, saude] = await Promise.all([
             api.get(`/ordens/${id}`),
             pode.atribuirTecnico() ? api.get("/usuarios/tecnicos") : Promise.resolve([]),
-            pode.diagnosticar() ? consultarSaude() : Promise.resolve(null),
+            pode.diagnosticar() ? iaDisponivel() : Promise.resolve(false),
         ]);
         const areaErroComprovante = h("div", {});
         const botaoComprovante = h("button", {
@@ -134,7 +134,7 @@ export async function telaOrdem(el, { params }) {
             type: "button",
             onClick: () => void ocupado(botaoComprovante, "Gerando…", areaErroComprovante, () => abrirComprovante(os.id)),
         }, "Comprovante");
-        preencher(el, h("p", { class: "migalha" }, h("a", { href: "#/ordens" }, "← Ordens de Serviço")), cabecalhoTela(numeroOS(os.numero), tagStatus(os.status), pode.comprovante() && botaoComprovante), areaErroComprovante, aviso && caixaOk(aviso), h("div", { class: "colunas" }, h("div", { class: "colunas__principal" }, secaoDados(os), os.status !== "ENTREGUE" && secaoOrcamento(os, carregar), secaoReparos(os, carregar), secaoHistorico(os)), h("aside", { class: "colunas__lado" }, secaoStatus(os, carregar), secaoTecnico(os, tecnicos, carregar), secaoAssistente(os, saude?.ia ?? false))));
+        preencher(el, h("p", { class: "migalha" }, h("a", { href: "#/ordens" }, "← Ordens de Serviço")), cabecalhoTela(numeroOS(os.numero), tagStatus(os.status), pode.comprovante() && botaoComprovante), areaErroComprovante, aviso && caixaOk(aviso), h("div", { class: "colunas" }, h("div", { class: "colunas__principal" }, secaoDados(os), os.status !== "ENTREGUE" && secaoOrcamento(os, carregar), secaoReparos(os, carregar), secaoHistorico(os)), h("aside", { class: "colunas__lado" }, secaoStatus(os, carregar), secaoTecnico(os, tecnicos, carregar), secaoAssistente(os, saude))));
     };
     await carregar();
 }
@@ -260,7 +260,7 @@ function secaoAssistente(os, iaAtiva) {
             inicio = form;
         }
         else {
-            inicio = caixaAviso("O assistente de IA não está disponível: defina ANTHROPIC_API_KEY no servidor para usá-lo.");
+            inicio = avisoIAIndisponivel(pode.configurar());
         }
     }
     return h("section", { class: "painel" }, h("h2", {}, "Assistente de diagnóstico"), lista, inicio, !lista && !inicio && h("p", { class: "vazio" }, podeUsar ? "Nenhum diagnóstico nesta OS." : "Nenhum diagnóstico registrado. O assistente é usado pelo técnico."));

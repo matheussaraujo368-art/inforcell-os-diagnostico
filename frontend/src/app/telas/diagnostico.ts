@@ -1,6 +1,6 @@
 /** HU05/HU06 — Sessão do assistente de diagnóstico com IA. */
-import { api, Avaliacao, CausaPossivel, consultarSaude, ErroApi, Medicao, Orientacao, pode, SessaoDiagnostico } from "../api.js";
-import { aoEnviar, cabecalhoTela, caixaAviso, caixaErro, caixaOk, campo, dataHora, h, numeroOS, ocupado, paraNumero, preencher } from "../dom.js";
+import { api, Avaliacao, CausaPossivel, iaDisponivel, ErroApi, Medicao, Orientacao, pode, SessaoDiagnostico } from "../api.js";
+import { aoEnviar, avisoIAIndisponivel, cabecalhoTela, caixaAviso, caixaErro, caixaOk, campo, dataHora, h, numeroOS, ocupado, paraNumero, preencher } from "../dom.js";
 import type { ContextoTela } from "../main.js";
 
 const ROTULO_PROBABILIDADE: Record<CausaPossivel["probabilidade"], string> = { alta: "Alta", media: "Média", baixa: "Baixa" };
@@ -95,7 +95,7 @@ export async function telaDiagnostico(el: HTMLElement, { params }: ContextoTela)
 
   /** `falha` mantém visível um erro da IA depois de recarregar a conversa. */
   const carregar = async (falha?: unknown, aviso?: string): Promise<void> => {
-    const [s, saude] = await Promise.all([api.get<SessaoDiagnostico>(`/diagnosticos/${id}`), consultarSaude()]);
+    const [s, saude] = await Promise.all([api.get<SessaoDiagnostico>(`/diagnosticos/${id}`), iaDisponivel()]);
     const ultimaIA = [...s.mensagens].reverse().find((m) => m.autor === "IA")?.dadosEstruturados ?? null;
     const ultimaDoTecnico = s.mensagens[s.mensagens.length - 1]?.autor === "TECNICO";
     const ativa = s.status === "ATIVA";
@@ -105,7 +105,7 @@ export async function telaDiagnostico(el: HTMLElement, { params }: ContextoTela)
       cabecalhoTela("Assistente de diagnóstico", h("span", { class: `etiqueta ${ativa ? "etiqueta--em_diagnostico" : "etiqueta--finalizado"}` }, ativa ? "Em andamento" : "Concluído")),
       h("p", { class: "texto-livre sintoma" }, h("strong", {}, "Sintoma: "), s.sintoma),
       aviso && caixaOk(aviso),
-      !saude?.ia && ativa && caixaAviso("O assistente de IA não está disponível no servidor. Seus resultados ainda podem ser registrados."),
+      !saude && ativa && avisoIAIndisponivel(pode.configurar(), "Seus resultados ainda podem ser registrados."),
       h(
         "div",
         { class: "colunas" },

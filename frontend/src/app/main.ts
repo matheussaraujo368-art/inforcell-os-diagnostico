@@ -3,6 +3,7 @@ import { definirAoExpirar, empresaAtual, pode, sair, usuarioAtual, validarSessao
 import { caixaErro, caixaOk, h } from "./dom.js";
 import { consumirAviso, definirAviso, irPara, registrarRenderizador } from "./nav.js";
 import { telaCadastro } from "./telas/cadastro.js";
+import { telaConfiguracoes } from "./telas/configuracoes.js";
 import { telaCliente, telaClientes } from "./telas/clientes.js";
 import { telaDiagnostico } from "./telas/diagnostico.js";
 import { telaEquipe } from "./telas/equipe.js";
@@ -20,6 +21,7 @@ type Tela = (el: HTMLElement, contexto: ContextoTela) => Promise<void>;
 const ROTAS: [RegExp, Tela][] = [
   [/^\/painel$/, telaPainel],
   [/^\/equipe$/, telaEquipe],
+  [/^\/configuracoes$/, telaConfiguracoes],
   [/^\/ordens$/, telaOrdens],
   [/^\/ordens\/nova$/, telaNovaOrdem],
   [/^\/ordens\/(\d+)$/, telaOrdem],
@@ -55,6 +57,7 @@ function cabecalho(caminho: string): HTMLElement {
         link("#/ordens", "Ordens de Serviço", "/ordens"),
         link("#/clientes", "Clientes", "/clientes"),
         pode.gerirEquipe() && link("#/equipe", "Equipe", "/equipe"),
+        pode.configurar() && link("#/configuracoes", "Configurações", "/configuracoes"),
       ),
     u &&
       h(

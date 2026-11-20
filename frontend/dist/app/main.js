@@ -3,6 +3,7 @@ import { definirAoExpirar, empresaAtual, pode, sair, usuarioAtual, validarSessao
 import { caixaErro, caixaOk, h } from "./dom.js";
 import { consumirAviso, definirAviso, irPara, registrarRenderizador } from "./nav.js";
 import { telaCadastro } from "./telas/cadastro.js";
+import { telaConfiguracoes } from "./telas/configuracoes.js";
 import { telaCliente, telaClientes } from "./telas/clientes.js";
 import { telaDiagnostico } from "./telas/diagnostico.js";
 import { telaEquipe } from "./telas/equipe.js";
@@ -12,6 +13,7 @@ import { telaPainel } from "./telas/painel.js";
 const ROTAS = [
     [/^\/painel$/, telaPainel],
     [/^\/equipe$/, telaEquipe],
+    [/^\/configuracoes$/, telaConfiguracoes],
     [/^\/ordens$/, telaOrdens],
     [/^\/ordens\/nova$/, telaNovaOrdem],
     [/^\/ordens\/(\d+)$/, telaOrdem],
@@ -27,7 +29,7 @@ function cabecalho(caminho) {
     const u = usuarioAtual();
     const link = (href, texto, prefixo) => h("a", { class: "app-nav__link", href, "aria-current": caminho.startsWith(prefixo) ? "page" : undefined }, texto);
     return h("div", { class: "container app-topo" }, h("a", { class: "logo", href: u ? INICIO : "index.html", "aria-label": "Inforcell OS, início" }, h("span", { class: "logo__icon", "aria-hidden": "true" }), h("span", { class: "logo__text" }, "INFORCELL", h("span", { class: "accent" }, " OS"))), u &&
-        h("nav", { class: "app-nav", "aria-label": "Navegação principal" }, link("#/painel", "Painel", "/painel"), link("#/ordens", "Ordens de Serviço", "/ordens"), link("#/clientes", "Clientes", "/clientes"), pode.gerirEquipe() && link("#/equipe", "Equipe", "/equipe")), u &&
+        h("nav", { class: "app-nav", "aria-label": "Navegação principal" }, link("#/painel", "Painel", "/painel"), link("#/ordens", "Ordens de Serviço", "/ordens"), link("#/clientes", "Clientes", "/clientes"), pode.gerirEquipe() && link("#/equipe", "Equipe", "/equipe"), pode.configurar() && link("#/configuracoes", "Configurações", "/configuracoes")), u &&
         h("div", { class: "app-usuario" }, h("span", { class: "app-usuario__empresa" }, empresaAtual()?.nome), h("span", {}, u.nome, " ", h("span", { class: "tag" }, ROTULO_PERFIL[u.perfil])), h("button", {
             class: "btn btn--outline btn--sm",
             type: "button",

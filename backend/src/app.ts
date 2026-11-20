@@ -14,6 +14,7 @@ import { ordensRoutes } from "./modules/ordens.routes";
 import { diagnosticosRoutes } from "./modules/diagnosticos.routes";
 import { conhecimentoRoutes } from "./modules/conhecimento.routes";
 import { dashboardRoutes } from "./modules/dashboard.routes";
+import { configuracoesRoutes } from "./modules/configuracoes.routes";
 
 /**
  * Publica as telas junto com a API, em um único endereço. Serve só o necessário para o site,
@@ -42,6 +43,7 @@ export function criarApp() {
   app.use(express.json({ limit: "1mb" }));
 
   app.get("/api/health", (_req, res) => {
+    // "ia" indica só a chave do servidor; cada empresa pode ter a própria (GET /api/configuracoes/ia/status).
     res.json({ status: "ok", servico: "inforcell-os-backend", ia: Boolean(env.ANTHROPIC_API_KEY) });
   });
 
@@ -57,6 +59,7 @@ export function criarApp() {
   api.use("/ordens", ordensRoutes);
   api.use("/conhecimento", conhecimentoRoutes);
   api.use("/dashboard", dashboardRoutes);
+  api.use("/configuracoes", configuracoesRoutes);
   api.use("/", diagnosticosRoutes); // /ordens/:osId/diagnosticos e /diagnosticos/:id
   app.use("/api", api);
 

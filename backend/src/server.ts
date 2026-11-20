@@ -6,7 +6,7 @@ const app = criarApp();
 
 const server = app.listen(env.PORT, () => {
   console.log(`Inforcell OS API rodando em http://localhost:${env.PORT}/api`);
-  if (!env.ANTHROPIC_API_KEY) console.warn("Aviso: ANTHROPIC_API_KEY não definida — o diagnóstico com IA ficará indisponível.");
+  if (!env.ANTHROPIC_API_KEY) console.warn("Aviso: ANTHROPIC_API_KEY não definida. A IA só funcionará para empresas que cadastrarem a própria chave em Configurações.");
 });
 
 async function encerrar() {
