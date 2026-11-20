@@ -34,6 +34,7 @@ import {
   ROTULO_STATUS,
   tagStatus,
 } from "../dom.js";
+import { campoFoto } from "../foto.js";
 import { definirAviso, hashComFiltros, irPara } from "../nav.js";
 import type { ContextoTela } from "../main.js";
 
@@ -529,6 +530,7 @@ function secaoAssistente(os: OrdemDetalhe, iaAtiva: boolean): HTMLElement {
   let inicio: HTMLElement | false = false;
   if (podeUsar && !ENCERRADOS.includes(os.status)) {
     if (iaAtiva) {
+      const foto = campoFoto();
       const form = h(
         "form",
         { class: "form" },
@@ -540,15 +542,17 @@ function secaoAssistente(os: OrdemDetalhe, iaAtiva: boolean): HTMLElement {
           valor: os.sessoes.length === 0 ? os.defeitoRelatado : "",
           atributos: { minlength: 3 },
         }),
-        h("button", { class: "btn btn--primary btn--sm btn--block", type: "submit" }, "Iniciar com a IA"),
+        h("details", { class: "dobra" }, h("summary", {}, "Anexar foto"), foto.elemento),
+        h("button", { class: "btn btn--primary btn--sm btn--block", type: "submit" }, "Iniciar com o agente de IA"),
       );
       aoEnviar(
         form,
         async (d) => {
-          const r = await api.post<{ sessao: SessaoDiagnostico }>(`/ordens/${os.id}/diagnosticos`, { sintoma: d.sintoma });
+          const imagem = await foto.obter();
+          const r = await api.post<{ sessao: SessaoDiagnostico }>(`/ordens/${os.id}/diagnosticos`, { sintoma: d.sintoma, ...(imagem ? { imagem } : {}) });
           irPara(`#/diagnosticos/${r.sessao.id}`);
         },
-        "Consultando a IA…",
+        "O agente está analisando…",
       );
       inicio = form;
     } else {

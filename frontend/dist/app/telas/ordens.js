@@ -1,6 +1,7 @@
 /** HU03/HU04 — Lista, abertura e acompanhamento das Ordens de Serviço. */
 import { api, iaDisponivel, pode, usuarioAtual, } from "../api.js";
 import { aoEnviar, cabecalhoTela, avisoIAIndisponivel, caixaAviso, caixaOk, campo, data, dataHora, dataParaIso, h, isoParaData, moeda, numeroOS, ocupado, ouNulo, paginador, paraNumero, preencher, ROTULO_STATUS, tagStatus, } from "../dom.js";
+import { campoFoto } from "../foto.js";
 import { definirAviso, hashComFiltros, irPara } from "../nav.js";
 // ---------- Lista ----------
 export async function telaOrdens(el, { consulta }) {
@@ -245,6 +246,7 @@ function secaoAssistente(os, iaAtiva) {
     let inicio = false;
     if (podeUsar && !ENCERRADOS.includes(os.status)) {
         if (iaAtiva) {
+            const foto = campoFoto();
             const form = h("form", { class: "form" }, campo({
                 rotulo: "Sintoma observado",
                 nome: "sintoma",
@@ -252,11 +254,12 @@ function secaoAssistente(os, iaAtiva) {
                 linhas: 3,
                 valor: os.sessoes.length === 0 ? os.defeitoRelatado : "",
                 atributos: { minlength: 3 },
-            }), h("button", { class: "btn btn--primary btn--sm btn--block", type: "submit" }, "Iniciar com a IA"));
+            }), h("details", { class: "dobra" }, h("summary", {}, "Anexar foto"), foto.elemento), h("button", { class: "btn btn--primary btn--sm btn--block", type: "submit" }, "Iniciar com o agente de IA"));
             aoEnviar(form, async (d) => {
-                const r = await api.post(`/ordens/${os.id}/diagnosticos`, { sintoma: d.sintoma });
+                const imagem = await foto.obter();
+                const r = await api.post(`/ordens/${os.id}/diagnosticos`, { sintoma: d.sintoma, ...(imagem ? { imagem } : {}) });
                 irPara(`#/diagnosticos/${r.sessao.id}`);
-            }, "Consultando a IA…");
+            }, "O agente está analisando…");
             inicio = form;
         }
         else {

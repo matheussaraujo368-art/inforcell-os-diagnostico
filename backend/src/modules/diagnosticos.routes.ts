@@ -5,7 +5,8 @@ import { prisma } from "../lib/prisma";
 import { autorizar, usuarioAtual, UsuarioToken } from "../middlewares/auth";
 import { AppError, notFound, parseId } from "../utils/http";
 import { buscarOS, garantirAcesso, medicaoSchema } from "./ordens.routes";
-import { consultarIA, ContextoDiagnostico, resumoParaHistorico, RespostaIA, TurnoConversa } from "../services/ia.service";
+import { consultarIA, ContextoDiagnostico, ImagemEnviada, resumoParaHistorico, RespostaIA, TurnoConversa } from "../services/ia.service";
+import { criarFerramentas } from "../services/ferramentasAgente";
 import { buscarArtigosRelevantes } from "../services/conhecimento.service";
 
 /**
@@ -40,6 +41,28 @@ async function contextoDaOS(osId: number, sintoma: string): Promise<ContextoDiag
     ),
     baseConhecimento: await buscarArtigosRelevantes(os.empresaId, eq.tipo, eq.marca, eq.modelo, `${sintoma} ${os.defeitoRelatado}`),
   };
+}
+
+/** Ferramentas do agente presas à empresa e à OS. */
+async function ferramentasDaOS(osId: number, empresaId: number) {
+  const os = await prisma.ordemServico.findFirstOrThrow({
+    where: { id: osId, empresaId },
+    select: { equipamento: { select: { tipo: true, marca: true, modelo: true } } },
+  });
+  return criarFerramentas({ empresaId, osId, equipamento: os.equipamento });
+}
+
+/** Foto opcional (JPEG/PNG/WebP/GIF em base64, até ~5 MB), enviada só à IA e não guardada. */
+const imagemSchema = z.object({
+  mediaType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif"]),
+  dados: z
+    .string()
+    .max(7_000_000, "A foto é grande demais. Use uma imagem de até 5 MB.")
+    .regex(/^[A-Za-z0-9+/=]+$/, "Foto em formato inválido."),
+});
+
+async function opcoesAgente(osId: number, empresaId: number, imagem?: ImagemEnviada) {
+  return { empresaId, ferramentas: await ferramentasDaOS(osId, empresaId), imagem };
 }
 
 async function carregarSessao(id: number, u: UsuarioToken) {
@@ -82,7 +105,7 @@ async function salvarRespostaIA(sessaoId: number, r: RespostaIA, medicaoId?: num
 // ---------- Iniciar diagnóstico (HU05) ----------
 diagnosticosRoutes.post("/ordens/:osId/diagnosticos", soTecnico, async (req, res) => {
   const u = usuarioAtual(req);
-  const { sintoma } = z.object({ sintoma: z.string().min(3) }).parse(req.body);
+  const { sintoma, imagem } = z.object({ sintoma: z.string().min(3), imagem: imagemSchema.optional() }).parse(req.body);
   const os = await buscarOS(parseId(req.params.osId), u);
   if (["FINALIZADO", "ENTREGUE", "CANCELADO"].includes(os.status)) {
     throw new AppError(409, "Não é possível iniciar diagnóstico em uma OS encerrada.");
@@ -90,7 +113,7 @@ diagnosticosRoutes.post("/ordens/:osId/diagnosticos", soTecnico, async (req, res
 
   // Consulta a IA antes de gravar para não deixar sessões vazias em caso de falha.
   const ctx = await contextoDaOS(os.id, sintoma);
-  const resposta = await consultarIA(ctx, [], u.empresaId);
+  const resposta = await consultarIA(ctx, [], await opcoesAgente(os.id, u.empresaId, imagem));
 
   const sessao = await prisma.$transaction(async (tx) => {
     // técnico que inicia o diagnóstico assume a OS e ela avança para EM_DIAGNOSTICO
@@ -136,7 +159,8 @@ diagnosticosRoutes.get("/diagnosticos/:id", soTecnico, async (req, res) => {
       mensagens: { orderBy: { id: "asc" } },
       medicoes: { orderBy: { id: "asc" } },
       tecnico: { select: { id: true, nome: true } },
-      os: { select: { numero: true } },
+      // Nome e telefone vão só para o navegador (mensagem ao cliente); nunca para a IA.
+      os: { select: { numero: true, valorOrcamento: true, cliente: { select: { nome: true, telefone: true } } } },
     },
   });
   res.json(completa);
@@ -146,26 +170,32 @@ diagnosticosRoutes.get("/diagnosticos/:id", soTecnico, async (req, res) => {
 const respostaTecnicoSchema = z.object({
   texto: z.string().min(1),
   medicao: medicaoSchema.optional(),
+  imagem: imagemSchema.optional(),
 });
 
 diagnosticosRoutes.post("/diagnosticos/:id/mensagens", soTecnico, async (req, res) => {
   const u = usuarioAtual(req);
   const sessao = await carregarSessao(parseId(req.params.id), u);
   if (sessao.status !== "ATIVA") throw new AppError(409, "Esta sessão de diagnóstico já foi concluída.");
-  const { texto, medicao } = respostaTecnicoSchema.parse(req.body);
+  const { texto, medicao, imagem } = respostaTecnicoSchema.parse(req.body);
 
   // Resultado do técnico é gravado primeiro: é dado real e não pode se perder se a IA falhar.
   const conteudo = medicao
     ? `${texto}\n[Medição] ${medicao.grandeza} em ${medicao.pontoMedicao}: ${medicao.valor} ${medicao.unidade}` +
-      (medicao.resultadoEsperado ? ` (esperado: ${medicao.resultadoEsperado})` : "")
-    : texto;
+      (medicao.resultadoEsperado ? ` (esperado: ${medicao.resultadoEsperado})` : "") +
+      (imagem ? "\n[Foto anexada]" : "")
+    : texto + (imagem ? "\n[Foto anexada]" : "");
   const [msgTecnico, medicaoCriada] = await prisma.$transaction(async (tx) => [
     await tx.mensagemDiagnostico.create({ data: { sessaoId: sessao.id, autor: "TECNICO", conteudo } }),
     medicao ? await tx.medicao.create({ data: { ...medicao, osId: sessao.osId, sessaoId: sessao.id } }) : null,
   ]);
 
   try {
-    const resposta = await consultarIA(await contextoDaOS(sessao.osId, sessao.sintoma), await turnosDaSessao(sessao.id), u.empresaId);
+    const resposta = await consultarIA(
+      await contextoDaOS(sessao.osId, sessao.sintoma),
+      await turnosDaSessao(sessao.id),
+      await opcoesAgente(sessao.osId, u.empresaId, imagem),
+    );
     const msgIA = await salvarRespostaIA(sessao.id, resposta, medicaoCriada?.id);
     res.status(201).json({ mensagemTecnico: msgTecnico, medicao: medicaoCriada, mensagemIA: msgIA, orientacao: resposta });
   } catch (e) {
@@ -181,7 +211,11 @@ diagnosticosRoutes.post("/diagnosticos/:id/continuar", soTecnico, async (req, re
   const u = usuarioAtual(req);
   const sessao = await carregarSessao(parseId(req.params.id), u);
   if (sessao.status !== "ATIVA") throw new AppError(409, "Esta sessão de diagnóstico já foi concluída.");
-  const resposta = await consultarIA(await contextoDaOS(sessao.osId, sessao.sintoma), await turnosDaSessao(sessao.id), u.empresaId);
+  const resposta = await consultarIA(
+    await contextoDaOS(sessao.osId, sessao.sintoma),
+    await turnosDaSessao(sessao.id),
+    await opcoesAgente(sessao.osId, u.empresaId),
+  );
   const ultimaMedicao = await prisma.medicao.findFirst({ where: { sessaoId: sessao.id }, orderBy: { id: "desc" } });
   const msgIA = await salvarRespostaIA(sessao.id, resposta, ultimaMedicao?.id);
   res.status(201).json({ mensagemIA: msgIA, orientacao: resposta });

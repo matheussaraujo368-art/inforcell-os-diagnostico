@@ -40,7 +40,10 @@ export function criarApp() {
       origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",").map((s) => s.trim()),
     }),
   );
-  app.use(express.json({ limit: "1mb" }));
+  // Fotos para o diagnóstico chegam em base64: só essas rotas aceitam corpo maior.
+  const jsonPadrao = express.json({ limit: "1mb" });
+  const jsonComFoto = express.json({ limit: "8mb" });
+  app.use((req, res, next) => (/\/diagnosticos(\/|$)/.test(req.path) ? jsonComFoto : jsonPadrao)(req, res, next));
 
   app.get("/api/health", (_req, res) => {
     // "ia" indica só a chave do servidor; cada empresa pode ter a própria (GET /api/configuracoes/ia/status).

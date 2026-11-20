@@ -4,6 +4,7 @@ import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { AppError } from "../utils/http";
 import { decifrar } from "./cripto";
+import type { Ferramentas, PassoAgente } from "./ferramentasAgente";
 
 /**
  * Serviço de Inteligência Artificial — diagnóstico guiado (Seção 9 do Documento Técnico).
@@ -43,6 +44,31 @@ export const respostaIASchema = z.object({
   diagnosticoConcluido: z.boolean().default(false),
   diagnosticoSugerido: z.string().nullable().default(null),
   alertasSeguranca: z.array(z.string()).default([]),
+  /** Preenchido ao concluir: itens e valores baseados nos reparos anteriores da assistência. */
+  sugestaoOrcamento: z
+    .object({
+      itens: z
+        .array(
+          z.object({
+            descricao: z.string(),
+            tipo: z.enum(["peca", "servico"]).catch("servico"),
+            valor: z.number().nullable().catch(null),
+          }),
+        )
+        .default([]),
+      valorTotal: z.number().nullable().catch(null),
+      prazoDias: z.number().nullable().catch(null),
+      observacao: z.string().nullable().catch(null),
+    })
+    .nullable()
+    .catch(null)
+    .default(null),
+  /** Texto simples para o cliente (WhatsApp). Usa {cliente} no lugar do nome, preenchido só no navegador. */
+  mensagemCliente: z.string().nullable().catch(null).default(null),
+  /** O que a IA viu na foto enviada pelo técnico, quando houver. */
+  analiseImagem: z.string().nullable().catch(null).default(null),
+  /** Consultas que o agente fez antes de responder (preenchido pelo servidor, não pela IA). */
+  passosAgente: z.array(z.object({ ferramenta: z.string(), resumo: z.string() })).default([]),
 });
 
 export type RespostaIA = z.infer<typeof respostaIASchema>;
@@ -99,14 +125,22 @@ Regras:
 - Inclua alertas de segurança quando houver risco (bateria estufada, alta tensão em fontes, ESD, curto).
 - Marque diagnosticoConcluido=true somente quando os testes já apontarem uma causa com boa confiança, e descreva-a em diagnosticoSugerido.
 - Você apoia a decisão do técnico; a decisão final é dele.
-- Use sempre a ferramenta registrar_orientacao para responder.`;
+
+Você é um agente: antes de responder, pode usar ferramentas de consulta ao sistema da assistência.
+- Na primeira resposta, consulte buscar_casos_semelhantes e buscar_base_conhecimento para ver os defeitos mais comuns deste modelo nesta assistência e use isso para ordenar as causas.
+- Quando o técnico relatar medições, use consultar_medicoes_da_os se precisar comparar com as anteriores.
+- Ao concluir o diagnóstico (diagnosticoConcluido=true), consulte consultar_reparos_e_precos e preencha sugestaoOrcamento com itens (peças e serviço). Use só valores vistos nos reparos anteriores; quando não houver referência, deixe o valor null e diga na observação que o preço precisa ser cotado. Nunca invente preços.
+- Ao concluir, escreva também mensagemCliente: 2 a 4 frases simples, sem jargão técnico, explicando ao cliente o defeito e o próximo passo (aprovação do orçamento). Comece com "Olá, {cliente}!" e não escreva nomes, telefones nem valores que não estejam no orçamento.
+- Se o técnico enviar uma foto, descreva em analiseImagem o que você observa (oxidação, componentes queimados, trincas, conectores danificados) e use isso no raciocínio.
+- Use no máximo 3 consultas por resposta e só as necessárias. Não repita uma consulta cujo resultado já está na conversa.
+- Termine SEMPRE chamando registrar_orientacao com a orientação final ao técnico.`;
 }
 
 export const SYSTEM_PROMPT = montarSystemPrompt();
 
 const FERRAMENTA: Anthropic.Tool = {
   name: "registrar_orientacao",
-  description: "Registra a orientação de diagnóstico para o técnico em formato estruturado.",
+  description: "Registra a orientação final de diagnóstico para o técnico, em formato estruturado. Chame depois das consultas.",
   input_schema: {
     type: "object",
     properties: {
@@ -142,6 +176,30 @@ const FERRAMENTA: Anthropic.Tool = {
       diagnosticoConcluido: { type: "boolean" },
       diagnosticoSugerido: { type: ["string", "null"] },
       alertasSeguranca: { type: "array", items: { type: "string" } },
+      sugestaoOrcamento: {
+        type: ["object", "null"],
+        description: "Somente ao concluir o diagnóstico.",
+        properties: {
+          itens: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                descricao: { type: "string" },
+                tipo: { type: "string", enum: ["peca", "servico"] },
+                valor: { type: ["number", "null"], description: "Em reais. null se não houver referência." },
+              },
+              required: ["descricao", "tipo"],
+            },
+          },
+          valorTotal: { type: ["number", "null"] },
+          prazoDias: { type: ["number", "null"] },
+          observacao: { type: ["string", "null"] },
+        },
+        required: ["itens"],
+      },
+      mensagemCliente: { type: ["string", "null"], description: "Somente ao concluir. Use {cliente} no lugar do nome." },
+      analiseImagem: { type: ["string", "null"], description: "O que foi observado na foto enviada, se houver." },
     },
     required: ["mensagem", "causasPossiveis", "proximaEtapa", "diagnosticoConcluido"],
   },
@@ -199,7 +257,16 @@ export function resumoParaHistorico(r: RespostaIA): string {
         (e.resultadoEsperado ? ` | Esperado: ${e.resultadoEsperado}` : ""),
     );
   }
+  if (r.analiseImagem) linhas.push(`Análise da foto: ${r.analiseImagem}`);
   if (r.diagnosticoConcluido && r.diagnosticoSugerido) linhas.push(`Diagnóstico sugerido: ${r.diagnosticoSugerido}`);
+  if (r.sugestaoOrcamento) {
+    const o = r.sugestaoOrcamento;
+    linhas.push(
+      "Orçamento sugerido: " +
+        o.itens.map((i) => `${i.descricao}${i.valor !== null ? ` R$ ${i.valor.toFixed(2)}` : " (cotar)"}`).join("; ") +
+        (o.valorTotal !== null ? ` | Total R$ ${o.valorTotal.toFixed(2)}` : ""),
+    );
+  }
   if (r.alertasSeguranca.length) linhas.push("Atenção: " + r.alertasSeguranca.join(" "));
   return linhas.join("\n");
 }
@@ -268,19 +335,41 @@ export function traduzirErroIA(e: unknown, modelo: string): AppError {
   return new AppError(502, "Falha ao consultar o serviço de IA. Tente novamente em instantes.");
 }
 
-const clienteAnthropic: ClienteIA = async (system, mensagens, config) => {
+// ---------- Agente: laço de decisão com ferramentas ----------
+
+/** Bloco de resposta do modelo (só os tipos que o agente usa). */
+export type BlocoModelo = { type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: unknown };
+
+export interface ChamadaModelo {
+  system: string;
+  messages: Anthropic.MessageParam[];
+  tools: Anthropic.Tool[];
+  /** "qualquer" = precisa usar alguma ferramenta; "final" = precisa responder com registrar_orientacao. */
+  escolha: "qualquer" | "final";
+}
+
+/** Uma chamada ao modelo. Pode ser substituída nos testes por um modelo simulado. */
+export type ModeloIA = (chamada: ChamadaModelo, config: ConfigIA) => Promise<{ content: BlocoModelo[] }>;
+
+/** Limite de idas e voltas por resposta: evita custo e espera excessivos. */
+export const MAX_PASSOS_AGENTE = 5;
+
+const modeloAnthropic: ModeloIA = async (chamada, config) => {
   try {
     const resp = await clienteDaChave(config.apiKey).messages.create({
       model: config.modelo,
-      max_tokens: 2048,
-      system,
-      tools: [FERRAMENTA],
-      tool_choice: { type: "tool", name: FERRAMENTA.name },
-      messages: mensagens,
+      max_tokens: 4096,
+      system: chamada.system,
+      tools: chamada.tools,
+      tool_choice: chamada.escolha === "final" ? { type: "tool", name: FERRAMENTA.name } : { type: "any" },
+      messages: chamada.messages,
     });
-    const bloco = resp.content.find((b) => b.type === "tool_use");
-    if (!bloco || bloco.type !== "tool_use") throw new AppError(502, "A IA não retornou uma orientação estruturada.");
-    return bloco.input;
+    const content: BlocoModelo[] = [];
+    for (const b of resp.content) {
+      if (b.type === "text") content.push({ type: "text", text: b.text });
+      else if (b.type === "tool_use") content.push({ type: "tool_use", id: b.id, name: b.name, input: b.input });
+    }
+    return { content };
   } catch (e) {
     throw traduzirErroIA(e, config.modelo);
   }
@@ -304,33 +393,105 @@ export async function testarChave(apiKey: string, modelo: string): Promise<{ mod
   }
 }
 
-let clienteAtual: ClienteIA = clienteAnthropic;
+let modeloAtual: ModeloIA = modeloAnthropic;
 
-/** Permite injetar um cliente falso (testes ou modo demonstração). */
-export function definirClienteIA(c: ClienteIA | null) {
-  clienteAtual = c ?? clienteAnthropic;
+/** Injeta um modelo simulado que conversa no formato do agente (testes). null volta ao real. */
+export function definirModeloIA(m: ModeloIA | null) {
+  modeloAtual = m ?? modeloAnthropic;
 }
 
-/** True quando a IA pode ser usada pela empresa (ou quando um cliente simulado está ativo). */
+/**
+ * Atalho para testes antigos: um cliente que devolve direto a orientação final.
+ * Ele é adaptado para o formato do agente (responde sempre com registrar_orientacao).
+ */
+export function definirClienteIA(c: ClienteIA | null) {
+  if (!c) {
+    modeloAtual = modeloAnthropic;
+    return;
+  }
+  modeloAtual = async (chamada, config) => ({
+    content: [{ type: "tool_use", id: "simulado", name: FERRAMENTA.name, input: await c(chamada.system, chamada.messages, config) }],
+  });
+}
+
+/** True quando a IA pode ser usada pela empresa (ou quando um modelo simulado está ativo). */
 export async function iaDisponivel(empresaId: number): Promise<boolean> {
-  return clienteAtual !== clienteAnthropic || (await configIADaEmpresa(empresaId)) !== null;
+  return modeloAtual !== modeloAnthropic || (await configIADaEmpresa(empresaId)) !== null;
 }
 
 export const MENSAGEM_IA_NAO_CONFIGURADA =
   "O assistente de IA não está configurado. O administrador da empresa pode cadastrar a chave da Anthropic em Configurações.";
 
-export async function consultarIA(ctx: ContextoDiagnostico, turnos: TurnoConversa[], empresaId?: number): Promise<RespostaIA> {
+/** Foto enviada pelo técnico junto com a mensagem (não é guardada; vai só nesta consulta). */
+export interface ImagemEnviada {
+  mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+  dados: string; // base64, sem o prefixo data:
+}
+
+export interface OpcoesConsulta {
+  empresaId?: number;
+  ferramentas?: Ferramentas;
+  imagem?: ImagemEnviada;
+}
+
+/** Coloca a foto na última mensagem do técnico. */
+function anexarImagem(msgs: Anthropic.MessageParam[], imagem: ImagemEnviada) {
+  const ultima = msgs[msgs.length - 1];
+  const textoAtual = typeof ultima.content === "string" ? ultima.content : "";
+  ultima.content = [
+    { type: "image", source: { type: "base64", media_type: imagem.mediaType, data: imagem.dados } },
+    { type: "text", text: `${textoAtual}\n\n[O técnico enviou a foto acima.]` },
+  ];
+}
+
+/**
+ * Agente de diagnóstico: o modelo pode chamar ferramentas de consulta (até MAX_PASSOS_AGENTE
+ * rodadas) e termina com registrar_orientacao. As consultas feitas ficam em passosAgente.
+ */
+export async function consultarIA(ctx: ContextoDiagnostico, turnos: TurnoConversa[], opcoes: OpcoesConsulta = {}): Promise<RespostaIA> {
   let config: ConfigIA = { apiKey: "", modelo: env.ANTHROPIC_MODEL, origem: "servidor" };
-  if (clienteAtual === clienteAnthropic) {
-    const encontrada = empresaId ? await configIADaEmpresa(empresaId) : null;
+  if (modeloAtual === modeloAnthropic) {
+    const encontrada = opcoes.empresaId ? await configIADaEmpresa(opcoes.empresaId) : null;
     if (!encontrada && !env.ANTHROPIC_API_KEY) throw new AppError(503, MENSAGEM_IA_NAO_CONFIGURADA);
     config = encontrada ?? { apiKey: env.ANTHROPIC_API_KEY as string, modelo: env.ANTHROPIC_MODEL, origem: "servidor" };
   }
-  const bruto = await clienteAtual(montarSystemPrompt(ctx.nomeEmpresa), montarMensagens(ctx, turnos), config);
-  const r = respostaIASchema.safeParse(bruto);
-  if (!r.success) {
-    console.error("[IA] resposta fora do formato:", r.error.issues);
-    throw new AppError(502, "A resposta da IA veio em formato inesperado. Tente novamente.");
+
+  const system = montarSystemPrompt(ctx.nomeEmpresa);
+  const mensagens = montarMensagens(ctx, turnos);
+  if (opcoes.imagem) anexarImagem(mensagens, opcoes.imagem);
+  const tools = [...(opcoes.ferramentas?.definicoes ?? []), FERRAMENTA];
+  const passos: PassoAgente[] = [];
+
+  for (let rodada = 1; rodada <= MAX_PASSOS_AGENTE; rodada++) {
+    const ultimaRodada = rodada === MAX_PASSOS_AGENTE || !opcoes.ferramentas;
+    const { content } = await modeloAtual({ system, messages: mensagens, tools, escolha: ultimaRodada ? "final" : "qualquer" }, config);
+    const usos = content.filter((b): b is Extract<BlocoModelo, { type: "tool_use" }> => b.type === "tool_use");
+
+    const final = usos.find((u) => u.name === FERRAMENTA.name);
+    if (final) {
+      const r = respostaIASchema.safeParse(final.input);
+      if (!r.success) {
+        console.error("[IA] resposta fora do formato:", r.error.issues);
+        throw new AppError(502, "A resposta da IA veio em formato inesperado. Tente novamente.");
+      }
+      return { ...r.data, passosAgente: passos };
+    }
+    if (!usos.length || !opcoes.ferramentas) throw new AppError(502, "A IA não retornou uma orientação estruturada.");
+
+    // Executa as consultas pedidas e devolve os resultados ao modelo.
+    mensagens.push({
+      role: "assistant",
+      content: content.map((b) =>
+        b.type === "text" ? { type: "text" as const, text: b.text } : { type: "tool_use" as const, id: b.id, name: b.name, input: b.input },
+      ),
+    });
+    const resultados: Anthropic.ToolResultBlockParam[] = [];
+    for (const u of usos) {
+      const r = await opcoes.ferramentas.executar(u.name, u.input);
+      passos.push({ ferramenta: u.name, resumo: r.resumo });
+      resultados.push({ type: "tool_result", tool_use_id: u.id, content: JSON.stringify(r.dados).slice(0, 12_000) });
+    }
+    mensagens.push({ role: "user", content: resultados });
   }
-  return r.data;
+  throw new AppError(502, "O agente não concluiu a orientação. Tente novamente.");
 }

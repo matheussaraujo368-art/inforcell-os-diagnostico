@@ -187,6 +187,18 @@ Como a IA é usada:
 |---|---|---|
 | GET | `/api/dashboard` | OS por status, em aberto, atrasadas, últimos 30 dias e OS abertas por técnico (HU08) |
 
+### Agente de diagnóstico
+A cada resposta, a IA funciona como um **agente**: antes de orientar o técnico, decide quais consultas fazer ao sistema (até 4 rodadas e, na 5ª, é obrigada a responder). As ferramentas ficam em `src/services/ferramentasAgente.ts`, são **somente leitura** e presas à empresa e à OS da sessão:
+
+| Ferramenta | O que devolve |
+|---|---|
+| `buscar_base_conhecimento` | artigos da base da empresa para os termos que a IA escolher |
+| `buscar_casos_semelhantes` | diagnósticos concluídos em aparelhos do mesmo modelo/marca |
+| `consultar_medicoes_da_os` | medições já registradas na OS |
+| `consultar_reparos_e_precos` | reparos anteriores do modelo, peças e valores (média, mínimo, máximo) |
+
+A resposta final (`registrar_orientacao`) pode trazer `sugestaoOrcamento`, `mensagemCliente` (com `{cliente}`, trocado pelo nome só no navegador) e `analiseImagem`. O servidor acrescenta `passosAgente` com as consultas feitas. `POST /ordens/:osId/diagnosticos` e `POST /diagnosticos/:id/mensagens` aceitam `imagem: { mediaType, dados }` (base64, até 5 MB), enviada só à IA e não guardada.
+
 ### Configurações — assistente de IA
 Cada empresa cadastra a própria chave da Anthropic. A chave é testada antes de salvar, fica criptografada (AES-256-GCM, com `CHAVE_CRIPTOGRAFIA` ou `JWT_SECRET`) e nunca volta inteira para o navegador. Sem chave da empresa, vale a `ANTHROPIC_API_KEY` do servidor.
 

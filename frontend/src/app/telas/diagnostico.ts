@@ -1,6 +1,7 @@
 /** HU05/HU06 — Sessão do assistente de diagnóstico com IA. */
-import { api, Avaliacao, CausaPossivel, iaDisponivel, ErroApi, Medicao, Orientacao, pode, SessaoDiagnostico } from "../api.js";
-import { aoEnviar, avisoIAIndisponivel, cabecalhoTela, caixaAviso, caixaErro, caixaOk, campo, dataHora, h, numeroOS, ocupado, paraNumero, preencher } from "../dom.js";
+import { api, Avaliacao, CausaPossivel, iaDisponivel, ErroApi, Medicao, Orientacao, pode, SessaoDiagnostico, SugestaoOrcamento } from "../api.js";
+import { aoEnviar, avisoIAIndisponivel, cabecalhoTela, caixaAviso, caixaErro, caixaOk, campo, dataHora, h, moeda, numeroOS, ocupado, paraNumero, preencher } from "../dom.js";
+import { campoFoto } from "../foto.js";
 import type { ContextoTela } from "../main.js";
 
 const ROTULO_PROBABILIDADE: Record<CausaPossivel["probabilidade"], string> = { alta: "Alta", media: "Média", baixa: "Baixa" };
@@ -27,9 +28,106 @@ function listaCausas(causas: CausaPossivel[]): HTMLElement {
   );
 }
 
-function balaoIA(o: Orientacao): HTMLElement[] {
+/** Consultas que o agente fez antes de responder. */
+function passosAgente(o: Orientacao): HTMLElement | false {
+  const passos = o.passosAgente ?? [];
+  if (!passos.length) return false;
+  return h(
+    "div",
+    { class: "agente-passos" },
+    h("span", { class: "agente-passos__titulo" }, `Agente · ${passos.length} consulta(s) ao sistema`),
+    h("ul", {}, passos.map((p) => h("li", {}, p.resumo))),
+  );
+}
+
+/** Contexto que só a última resposta da IA usa (botões de ação). */
+interface Acoes {
+  sessao: SessaoDiagnostico;
+  recarregar: Recarregar;
+}
+
+function cartaoOrcamento(o: SugestaoOrcamento, acoes: Acoes | null): HTMLElement | false {
+  if (!o.itens.length) return false;
+  const areaErro = h("div", {});
+  const total = o.valorTotal;
+  const botao =
+    acoes && total !== null && total > 0
+      ? h("button", { class: "btn btn--primary btn--sm", type: "button" }, `Aplicar ${moeda(total)} como orçamento da OS`)
+      : null;
+  botao?.addEventListener("click", () =>
+    void ocupado(botao, "Aplicando…", areaErro, async () => {
+      await api.patch(`/ordens/${acoes!.sessao.osId}`, { valorOrcamento: total });
+      await acoes!.recarregar(undefined, `Orçamento de ${moeda(total)} aplicado na OS. Revise antes de pedir a aprovação do cliente.`);
+    }),
+  );
+  const atual = acoes?.sessao.os.valorOrcamento;
+  return h(
+    "div",
+    { class: "cartao-agente" },
+    h("h3", {}, "Orçamento sugerido"),
+    h(
+      "table",
+      { class: "orcamento" },
+      h(
+        "tbody",
+        {},
+        o.itens.map((i) =>
+          h("tr", {}, h("td", {}, i.descricao, h("span", { class: "item__sub" }, i.tipo === "peca" ? " · peça" : " · serviço")), h("td", { class: "orcamento__valor" }, i.valor !== null ? moeda(i.valor) : "cotar")),
+        ),
+        total !== null && h("tr", { class: "orcamento__total" }, h("td", {}, "Total"), h("td", { class: "orcamento__valor" }, moeda(total))),
+      ),
+    ),
+    o.prazoDias !== null && h("p", { class: "item__sub" }, `Prazo estimado: ${o.prazoDias} dia(s)`),
+    o.observacao && h("p", { class: "item__sub texto-livre" }, o.observacao),
+    atual !== null && atual !== undefined && h("p", { class: "item__sub" }, `Orçamento atual da OS: ${moeda(atual)}`),
+    botao && h("div", { class: "form__acoes" }, botao),
+    areaErro,
+  );
+}
+
+/** Deixa só os dígitos e acrescenta o código do Brasil, para o link do WhatsApp. */
+function telefoneWhatsApp(telefone: string): string | null {
+  const d = telefone.replace(/\D/g, "");
+  if (d.length === 10 || d.length === 11) return `55${d}`;
+  if ((d.length === 12 || d.length === 13) && d.startsWith("55")) return d;
+  return null;
+}
+
+/** O nome do cliente entra só aqui, no navegador: a IA escreve {cliente}. */
+function cartaoMensagemCliente(modelo: string, acoes: Acoes | null): HTMLElement {
+  const cliente = acoes?.sessao.os.cliente;
+  const primeiroNome = cliente?.nome.trim().split(/\s+/)[0] ?? "";
+  const texto = modelo.split("{cliente}").join(primeiroNome || "cliente");
+  const areaAviso = h("span", { class: "item__sub", role: "status" });
+  const copiar = h("button", { class: "btn btn--outline btn--sm", type: "button" }, "Copiar");
+  copiar.addEventListener("click", () => {
+    navigator.clipboard.writeText(texto).then(
+      () => (areaAviso.textContent = "Copiado."),
+      () => (areaAviso.textContent = "Não foi possível copiar. Selecione o texto manualmente."),
+    );
+  });
+  const numero = cliente ? telefoneWhatsApp(cliente.telefone) : null;
+  return h(
+    "div",
+    { class: "cartao-agente" },
+    h("h3", {}, "Mensagem para o cliente"),
+    h("p", { class: "texto-livre mensagem-cliente" }, texto),
+    h(
+      "div",
+      { class: "form__acoes" },
+      copiar,
+      numero &&
+        h("a", { class: "btn btn--primary btn--sm", href: `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, target: "_blank", rel: "noopener" }, "Abrir no WhatsApp"),
+      areaAviso,
+    ),
+  );
+}
+
+function balaoIA(o: Orientacao, acoes: Acoes | null = null): HTMLElement[] {
   const etapa = o.proximaEtapa;
   return [
+    passosAgente(o),
+    o.analiseImagem && h("div", { class: "etapa" }, h("strong", {}, "Análise da foto: "), h("span", { class: "texto-livre" }, o.analiseImagem)),
     h("p", { class: "texto-livre" }, o.mensagem),
     o.interpretacaoUltimoResultado &&
       h(
@@ -56,6 +154,8 @@ function balaoIA(o: Orientacao): HTMLElement[] {
         ),
       ),
     o.diagnosticoConcluido && o.diagnosticoSugerido && h("p", { class: "texto-livre" }, h("strong", {}, "Diagnóstico sugerido: "), o.diagnosticoSugerido),
+    o.sugestaoOrcamento && cartaoOrcamento(o.sugestaoOrcamento, acoes),
+    o.mensagemCliente && cartaoMensagemCliente(o.mensagemCliente, acoes),
   ].filter(Boolean) as HTMLElement[];
 }
 
@@ -96,7 +196,8 @@ export async function telaDiagnostico(el: HTMLElement, { params }: ContextoTela)
   /** `falha` mantém visível um erro da IA depois de recarregar a conversa. */
   const carregar = async (falha?: unknown, aviso?: string): Promise<void> => {
     const [s, saude] = await Promise.all([api.get<SessaoDiagnostico>(`/diagnosticos/${id}`), iaDisponivel()]);
-    const ultimaIA = [...s.mensagens].reverse().find((m) => m.autor === "IA")?.dadosEstruturados ?? null;
+    const msgUltimaIA = [...s.mensagens].reverse().find((m) => m.autor === "IA");
+    const ultimaIA = msgUltimaIA?.dadosEstruturados ?? null;
     const ultimaDoTecnico = s.mensagens[s.mensagens.length - 1]?.autor === "TECNICO";
     const ativa = s.status === "ATIVA";
 
@@ -124,7 +225,9 @@ export async function telaDiagnostico(el: HTMLElement, { params }: ContextoTela)
                   "li",
                   { class: `balao balao--${m.autor === "IA" ? "ia" : "tecnico"}` },
                   h("p", { class: "balao__autor" }, m.autor === "IA" ? "Assistente" : s.tecnico.nome, ` · ${dataHora(m.createdAt)}`),
-                  m.autor === "IA" && m.dadosEstruturados ? balaoIA(m.dadosEstruturados) : h("p", { class: "texto-livre" }, m.conteudo),
+                  m.autor === "IA" && m.dadosEstruturados
+                    ? balaoIA(m.dadosEstruturados, m === msgUltimaIA ? { sessao: s, recarregar: carregar } : null)
+                    : h("p", { class: "texto-livre" }, m.conteudo),
                 ),
               ),
             ),
@@ -163,7 +266,7 @@ function botaoContinuar(id: number, carregar: Recarregar): HTMLElement {
       class: "btn btn--outline btn--sm",
       type: "button",
       onClick: () =>
-        void ocupado(botao, "Consultando a IA…", areaErro, async () => {
+        void ocupado(botao, "O agente está analisando…", areaErro, async () => {
           await api.post(`/diagnosticos/${id}/continuar`);
           await carregar();
         }),
@@ -175,6 +278,7 @@ function botaoContinuar(id: number, carregar: Recarregar): HTMLElement {
 
 function formResultado(id: number, ultima: Orientacao | null, carregar: Recarregar): HTMLElement {
   const etapa = ultima?.proximaEtapa ?? null;
+  const foto = campoFoto();
   const form = h(
     "form",
     { class: "form" },
@@ -193,12 +297,15 @@ function formResultado(id: number, ultima: Orientacao | null, carregar: Recarreg
         campo({ rotulo: "Resultado esperado", nome: "resultadoEsperado", valor: etapa?.resultadoEsperado?.slice(0, 120), atributos: { maxlength: 120 } }),
       ),
     ),
+    h("details", { class: "dobra" }, h("summary", {}, "Anexar foto"), foto.elemento),
     h("button", { class: "btn btn--primary btn--sm", type: "submit" }, "Enviar resultado"),
   );
   aoEnviar(
     form,
     async (d) => {
-      const corpo: { texto: string; medicao?: unknown } = { texto: d.texto };
+      const corpo: { texto: string; medicao?: unknown; imagem?: unknown } = { texto: d.texto };
+      const imagem = await foto.obter();
+      if (imagem) corpo.imagem = imagem;
       if (d.valor || d.grandeza || d.unidade) {
         const valor = paraNumero(d.valor);
         if (!d.valor || !Number.isFinite(valor)) throw new Error("Informe um valor numérico para a medição, como 5,02.");
@@ -223,7 +330,7 @@ function formResultado(id: number, ultima: Orientacao | null, carregar: Recarreg
       }
       await carregar();
     },
-    "Consultando a IA…",
+    "O agente está analisando…",
   );
   return form;
 }

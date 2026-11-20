@@ -142,6 +142,18 @@ export interface Orientacao {
   diagnosticoConcluido: boolean;
   diagnosticoSugerido: string | null;
   alertasSeguranca: string[];
+  /** Campos do agente (podem faltar em mensagens antigas). */
+  sugestaoOrcamento?: SugestaoOrcamento | null;
+  mensagemCliente?: string | null;
+  analiseImagem?: string | null;
+  passosAgente?: { ferramenta: string; resumo: string }[];
+}
+
+export interface SugestaoOrcamento {
+  itens: { descricao: string; tipo: "peca" | "servico"; valor: number | null }[];
+  valorTotal: number | null;
+  prazoDias: number | null;
+  observacao: string | null;
 }
 
 export interface Medicao {
@@ -156,7 +168,7 @@ export interface Medicao {
 
 export interface SessaoDiagnostico extends SessaoResumo {
   osId: number;
-  os: { numero: number };
+  os: { numero: number; valorOrcamento: string | number | null; cliente: { nome: string; telefone: string } };
   causasPossiveis: CausaPossivel[] | null;
   concluidaEm: string | null;
   tecnico: { id: number; nome: string };
