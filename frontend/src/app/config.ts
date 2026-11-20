@@ -3,16 +3,21 @@
  * Ordem de prioridade:
  *  1. valor salvo neste navegador pela tela de login;
  *  2. <meta name="inforcell-api"> do app.html, com uma URL completa;
- *  3. com "auto" na meta: a API local, no servidor de desenvolvimento (porta 5173),
+ *  3. com "auto" na meta: a API local, no servidor de desenvolvimento (porta 5173);
+ *     a API do Render, quando o site está no GitHub Pages (que não tem API);
  *     ou o próprio endereço do site, quando a API entrega as telas.
  */
 const CHAVE_URL = "inforcell.apiUrl";
 const URL_LOCAL = "http://localhost:3333/api";
+/** API publicada no Render. Atualize se o nome do serviço mudar. */
+const URL_RENDER = "https://inforcell-os.onrender.com/api";
 
 export function urlPadrao(): string {
   const meta = document.querySelector<HTMLMetaElement>('meta[name="inforcell-api"]')?.content.trim();
   if (meta && meta !== "auto") return meta;
-  return location.port === "5173" ? URL_LOCAL : `${location.origin}/api`;
+  if (location.port === "5173") return URL_LOCAL;
+  if (location.hostname.endsWith("github.io")) return URL_RENDER;
+  return `${location.origin}/api`;
 }
 
 export function urlApi(): string {

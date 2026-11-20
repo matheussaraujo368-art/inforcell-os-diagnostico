@@ -6,7 +6,7 @@ services:
     runtime: node
     plan: free
     region: virginia
-    branch: feature/publicacao
+    branch: main
     buildCommand: cd backend && npm ci --include=dev && npx prisma generate && npm run build
     startCommand: cd backend && npx prisma migrate deploy && npm start
     healthCheckPath: /api/health
@@ -21,3 +21,9 @@ services:
         value: 8h
       - key: DATABASE_URL
         sync: false
+      - key: CORS_ORIGIN
+        value: https://rafaelpontara.github.io,https://inforcell-os.onrender.com
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5-5
