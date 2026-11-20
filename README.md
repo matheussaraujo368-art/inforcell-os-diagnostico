@@ -2,6 +2,10 @@
 
 Plataforma inteligente para gestão de Ordens de Serviço e diagnóstico assistido por IA de equipamentos eletrônicos (celulares e computadores), desenvolvida para a **Inforcell** (Balsas – MA), como projeto da disciplina de Programação para Web — UNIBALSAS.
 
+## Rodar no seu PC
+
+Veja **[COMO-RODAR-NO-PC.md](COMO-RODAR-NO-PC.md)**. No Windows, dê dois cliques em `iniciar-windows.bat`.
+
 ## Equipe
 
 - Matheus de Brito Araujo

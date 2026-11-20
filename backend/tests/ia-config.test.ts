@@ -55,8 +55,9 @@ describe("mensagens de erro da IA", () => {
   });
 
   it("o prompt usa o nome da empresa", () => {
-    expect(montarSystemPrompt("Assistência Teste")).toContain("assistente de diagnóstico da Assistência Teste");
+    expect(montarSystemPrompt("Assistência Teste")).toContain("agente de diagnóstico da Assistência Teste");
     expect(montarSystemPrompt("")).toContain("da Inforcell");
+    expect(montarSystemPrompt("X")).toContain("foco principal em CELULARES");
   });
 });
 

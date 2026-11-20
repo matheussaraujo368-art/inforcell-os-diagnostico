@@ -1,0 +1,18 @@
+# Banco MySQL 8 para rodar o sistema no seu PC (opcional).
+# Uso: docker compose up -d   (precisa do Docker Desktop)
+# Porta 3307 para não brigar com um MySQL/XAMPP que já use a 3306.
+# DATABASE_URL correspondente: mysql://root:inforcell@localhost:3307/inforcell_os
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: inforcell-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: inforcell
+      MYSQL_DATABASE: inforcell_os
+    ports:
+      - "3307:3306"
+    volumes:
+      - inforcell-dados:/var/lib/mysql
+volumes:
+  inforcell-dados:
