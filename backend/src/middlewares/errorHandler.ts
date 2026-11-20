@@ -20,6 +20,9 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     if (err.code === "P2025") return res.status(404).json({ erro: "Registro não encontrado." });
     if (err.code === "P2003") return res.status(400).json({ erro: "Referência inválida (registro relacionado não existe)." });
   }
+  if (typeof err === "object" && err !== null && (err as { type?: string }).type === "entity.too.large") {
+    return res.status(413).json({ erro: "O conteúdo enviado é grande demais. Fotos devem ter até 5 MB." });
+  }
   if (err instanceof SyntaxError && "body" in (err as object)) {
     return res.status(400).json({ erro: "JSON malformado." });
   }
