@@ -355,6 +355,18 @@ export interface SituacaoIA {
   modelo: string;
   modeloPadrao: string;
   modelosSugeridos: string[];
+  catalogo: ModeloCatalogo[];
+}
+
+export interface ModeloCatalogo {
+  id: string;
+  nome: string;
+  grupo: "atual" | "anterior";
+  descricao: string;
+  /** US$ por milhão de tokens */
+  entrada: number;
+  saida: number;
+  velocidade: string;
 }
 
 export interface TesteIA {

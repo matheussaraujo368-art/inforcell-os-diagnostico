@@ -6,7 +6,7 @@ import { prisma } from "../lib/prisma";
 import { autorizar, usuarioAtual } from "../middlewares/auth";
 import { AppError } from "../utils/http";
 import { cifrar, decifrar, mascararChave } from "../services/cripto";
-import { configIADaEmpresa, iaDisponivel, MODELOS_SUGERIDOS, testarChave } from "../services/ia.service";
+import { CATALOGO_MODELOS, configIADaEmpresa, iaDisponivel, MODELOS_SUGERIDOS, testarChave } from "../services/ia.service";
 
 /**
  * Configurações da empresa — assistente de IA.
@@ -51,6 +51,7 @@ async function situacaoIA(empresaId: number) {
     modelo: empresa.iaModelo || env.ANTHROPIC_MODEL,
     modeloPadrao: env.ANTHROPIC_MODEL,
     modelosSugeridos: MODELOS_SUGERIDOS,
+    catalogo: CATALOGO_MODELOS,
   };
 }
 

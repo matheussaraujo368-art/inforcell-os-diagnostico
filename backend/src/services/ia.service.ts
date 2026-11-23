@@ -284,8 +284,41 @@ export function resumoParaHistorico(r: RespostaIA): string {
 
 // ---------- Chave e modelo de cada empresa ----------
 
-/** Modelos sugeridos na tela de Configurações (a lista real vem da API, quando há chave). */
-export const MODELOS_SUGERIDOS = ["claude-sonnet-5-5", "claude-opus-5-5", "claude-haiku-5-5"];
+/**
+ * Catálogo mostrado em Configurações (IDs da API da Anthropic, preços em US$ por milhão de tokens).
+ * Fonte: platform.claude.com/docs/en/about-claude/models/overview. Modelos de acesso restrito
+ * (Mythos) e aposentados ficam de fora. A chave pode ter acesso a outros: eles aparecem à parte.
+ */
+export interface ModeloCatalogo {
+  id: string;
+  nome: string;
+  grupo: "atual" | "anterior";
+  descricao: string;
+  entrada: number;
+  saida: number;
+  velocidade: "Muito rápido" | "Rápido" | "Moderado";
+}
+
+export const CATALOGO_MODELOS: ModeloCatalogo[] = [
+  { id: "claude-sonnet-5-5", nome: "Claude Sonnet 5.5", grupo: "atual", descricao: "Melhor equilíbrio entre qualidade, velocidade e custo. Recomendado para o dia a dia.", entrada: 2, saida: 10, velocidade: "Rápido" },
+  { id: "claude-haiku-5-5", nome: "Claude Haiku 5.5", grupo: "atual", descricao: "O mais rápido e barato. Bom para muito uso e respostas curtas.", entrada: 0.1, saida: 0.5, velocidade: "Muito rápido" },
+  { id: "claude-opus-5-5", nome: "Claude Opus 5.5", grupo: "atual", descricao: "Mais capaz em casos difíceis e raciocínio longo. Custa o dobro do Sonnet.", entrada: 4, saida: 20, velocidade: "Moderado" },
+  { id: "claude-fable-5-2", nome: "Claude Fable 5.2", grupo: "atual", descricao: "O mais poderoso, para os defeitos mais difíceis. O mais caro.", entrada: 8, saida: 40, velocidade: "Moderado" },
+  { id: "claude-fable-5-1", nome: "Claude Fable 5.1", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 10, saida: 50, velocidade: "Moderado" },
+  { id: "claude-fable-5", nome: "Claude Fable 5", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 10, saida: 50, velocidade: "Moderado" },
+  { id: "claude-opus-5", nome: "Claude Opus 5", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 5, saida: 25, velocidade: "Moderado" },
+  { id: "claude-sonnet-5", nome: "Claude Sonnet 5", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 2, saida: 10, velocidade: "Rápido" },
+  { id: "claude-opus-4-8", nome: "Claude Opus 4.8", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 5, saida: 25, velocidade: "Moderado" },
+  { id: "claude-opus-4-7", nome: "Claude Opus 4.7", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 5, saida: 25, velocidade: "Moderado" },
+  { id: "claude-opus-4-6", nome: "Claude Opus 4.6", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 5, saida: 25, velocidade: "Moderado" },
+  { id: "claude-sonnet-4-6", nome: "Claude Sonnet 4.6", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 3, saida: 15, velocidade: "Rápido" },
+  { id: "claude-opus-4-5", nome: "Claude Opus 4.5", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 5, saida: 25, velocidade: "Moderado" },
+  { id: "claude-sonnet-4-5", nome: "Claude Sonnet 4.5", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 3, saida: 15, velocidade: "Rápido" },
+  { id: "claude-haiku-4-5", nome: "Claude Haiku 4.5", grupo: "anterior", descricao: "Geração anterior: em geral custa o mesmo ou mais e é menos capaz que os atuais. Use para comparar.", entrada: 1, saida: 5, velocidade: "Muito rápido" },
+];
+
+/** IDs do catálogo (mantido para quem usava a lista simples). */
+export const MODELOS_SUGERIDOS = CATALOGO_MODELOS.map((m) => m.id);
 
 /**
  * Descobre qual chave usar: a da empresa (Configurações) tem prioridade; sem ela, a do servidor.
@@ -309,7 +342,7 @@ export function clienteDaChave(apiKey: string): Anthropic {
   let c = clientes.get(apiKey);
   if (!c) {
     if (clientes.size >= 50) clientes.clear(); // evita acumular chaves trocadas
-    c = new Anthropic({ apiKey, timeout: 60_000, maxRetries: 2 });
+    c = new Anthropic({ apiKey, timeout: 180_000, maxRetries: 2 });
     clientes.set(apiKey, c);
   }
   return c;
@@ -363,26 +396,47 @@ export interface ChamadaModelo {
 }
 
 /** Uma chamada ao modelo. Pode ser substituída nos testes por um modelo simulado. */
-export type ModeloIA = (chamada: ChamadaModelo, config: ConfigIA) => Promise<{ content: BlocoModelo[] }>;
+export type ModeloIA = (
+  chamada: ChamadaModelo,
+  config: ConfigIA,
+) => Promise<{
+  content: BlocoModelo[];
+  /**
+   * Blocos originais da resposta (inclui o raciocínio/"thinking"). Precisam voltar inalterados
+   * na próxima rodada quando há uso de ferramentas.
+   */
+  brutos?: Anthropic.ContentBlockParam[];
+  /** "max_tokens" quando a resposta foi cortada por tamanho. */
+  parada?: string | null;
+}>;
 
 /** Limite de idas e voltas por resposta: evita custo e espera excessivos. */
 export const MAX_PASSOS_AGENTE = 5;
 
+/**
+ * Modelos que recusam ferramenta obrigatória (tool_choice "any"/"tool") por terem o raciocínio
+ * sempre ligado. Para eles, e por segurança para qualquer modelo, o agente usa "auto" e pede
+ * no texto que a ferramenta seja chamada.
+ */
+const usaEscolhaForcada = (_modelo: string): boolean => false;
+
 const modeloAnthropic: ModeloIA = async (chamada, config) => {
   try {
+    const forcar = usaEscolhaForcada(config.modelo);
     const resp = await clienteDaChave(config.apiKey).messages.create({
       model: config.modelo,
-      max_tokens: 4096,
+      // O raciocínio dos modelos atuais também consome tokens: margem folgada para não cortar a resposta.
+      max_tokens: 16000,
       system: chamada.system,
       tools: chamada.tools,
       tool_choice:
-        chamada.escolha === "final"
-          ? { type: "tool", name: FERRAMENTA.name }
-          : chamada.escolha === "qualquer"
-            ? { type: "any" }
-            : chamada.escolha === "auto"
-              ? { type: "auto" }
-              : { type: "none" },
+        chamada.escolha === "nenhuma"
+          ? { type: "none" }
+          : forcar && chamada.escolha === "final"
+            ? { type: "tool", name: FERRAMENTA.name }
+            : forcar && chamada.escolha === "qualquer"
+              ? { type: "any" }
+              : { type: "auto" },
       messages: chamada.messages,
     });
     const content: BlocoModelo[] = [];
@@ -390,11 +444,21 @@ const modeloAnthropic: ModeloIA = async (chamada, config) => {
       if (b.type === "text") content.push({ type: "text", text: b.text });
       else if (b.type === "tool_use") content.push({ type: "tool_use", id: b.id, name: b.name, input: b.input });
     }
-    return { content };
+    return { content, brutos: resp.content as unknown as Anthropic.ContentBlockParam[], parada: resp.stop_reason };
   } catch (e) {
     throw traduzirErroIA(e, config.modelo);
   }
 };
+
+/** Conteúdo da resposta para devolver ao modelo na próxima rodada (com o raciocínio, se houver). */
+export function blocosParaHistorico(r: { content: BlocoModelo[]; brutos?: Anthropic.ContentBlockParam[] }): Anthropic.ContentBlockParam[] {
+  return (
+    r.brutos ??
+    r.content.map((b) =>
+      b.type === "text" ? { type: "text" as const, text: b.text } : { type: "tool_use" as const, id: b.id, name: b.name, input: b.input },
+    )
+  );
+}
 
 /**
  * Confere se a chave funciona e se o modelo existe, sem gastar créditos (consulta a lista de
@@ -492,9 +556,13 @@ export async function consultarIA(ctx: ContextoDiagnostico, turnos: TurnoConvers
   const passos: PassoAgente[] = [];
 
   for (let rodada = 1; rodada <= MAX_PASSOS_AGENTE; rodada++) {
+    // Na última rodada (ou sem ferramentas de consulta) só a ferramenta final é oferecida.
     const ultimaRodada = rodada === MAX_PASSOS_AGENTE || !opcoes.ferramentas;
-    const { content } = await modeloAtual({ system, messages: mensagens, tools, escolha: ultimaRodada ? "final" : "qualquer" }, config);
-    const usos = content.filter((b): b is Extract<BlocoModelo, { type: "tool_use" }> => b.type === "tool_use");
+    const resposta = await modeloAtual(
+      { system, messages: mensagens, tools: ultimaRodada ? [FERRAMENTA] : tools, escolha: ultimaRodada ? "final" : "qualquer" },
+      config,
+    );
+    const usos = resposta.content.filter((b): b is Extract<BlocoModelo, { type: "tool_use" }> => b.type === "tool_use");
 
     const final = usos.find((u) => u.name === FERRAMENTA.name);
     if (final) {
@@ -505,18 +573,25 @@ export async function consultarIA(ctx: ContextoDiagnostico, turnos: TurnoConvers
       }
       return { ...r.data, passosAgente: passos };
     }
-    if (!usos.length || !opcoes.ferramentas) throw new AppError(502, "A IA não retornou uma orientação estruturada.");
+
+    if (rodada === MAX_PASSOS_AGENTE) break;
+    mensagens.push({ role: "assistant", content: blocosParaHistorico(resposta) });
+
+    if (!usos.length) {
+      // Respondeu em texto em vez de usar a ferramenta: pede o registro estruturado.
+      mensagens.push({
+        role: "user",
+        content: "Registre agora a orientação chamando a ferramenta registrar_orientacao, no formato estruturado.",
+      });
+      continue;
+    }
 
     // Executa as consultas pedidas e devolve os resultados ao modelo.
-    mensagens.push({
-      role: "assistant",
-      content: content.map((b) =>
-        b.type === "text" ? { type: "text" as const, text: b.text } : { type: "tool_use" as const, id: b.id, name: b.name, input: b.input },
-      ),
-    });
     const resultados: Anthropic.ToolResultBlockParam[] = [];
     for (const u of usos) {
-      const r = await opcoes.ferramentas.executar(u.name, u.input);
+      const r = opcoes.ferramentas
+        ? await opcoes.ferramentas.executar(u.name, u.input)
+        : { dados: "Ferramenta indisponível.", resumo: `Tentou usar ${u.name}` };
       passos.push({ ferramenta: u.name, resumo: r.resumo });
       resultados.push({ type: "tool_result", tool_use_id: u.id, content: JSON.stringify(r.dados).slice(0, 12_000) });
     }

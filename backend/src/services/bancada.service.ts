@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { AppError } from "../utils/http";
 import type { Ferramentas, PassoAgente } from "./ferramentasAgente";
-import { BlocoModelo, CONHECIMENTO_CELULAR, ImagemEnviada, MAX_PASSOS_AGENTE, prepararModelo, sanitizarTexto } from "./ia.service";
+import { BlocoModelo, blocosParaHistorico, CONHECIMENTO_CELULAR, ImagemEnviada, MAX_PASSOS_AGENTE, prepararModelo, sanitizarTexto } from "./ia.service";
 
 /**
  * Assistente de bancada: conversa livre do técnico com a IA, fora de uma OS.
@@ -91,10 +91,11 @@ export async function conversarBancada(
   const passos: PassoAgente[] = [];
   for (let rodada = 1; rodada <= MAX_PASSOS_AGENTE; rodada++) {
     const ultimaRodada = rodada === MAX_PASSOS_AGENTE;
-    const { content } = await modelo(
+    const resposta = await modelo(
       { system, messages: compactadas, tools: ferramentas.definicoes, escolha: ultimaRodada ? "nenhuma" : "auto" },
       config,
     );
+    const { content } = resposta;
     const usos = content.filter((b): b is Extract<BlocoModelo, { type: "tool_use" }> => b.type === "tool_use");
     if (!usos.length) {
       const resposta = content
@@ -105,12 +106,7 @@ export async function conversarBancada(
       if (!resposta) throw new AppError(502, "A IA não retornou uma resposta. Tente novamente.");
       return { texto: resposta, passos };
     }
-    compactadas.push({
-      role: "assistant",
-      content: content.map((b) =>
-        b.type === "text" ? { type: "text" as const, text: b.text } : { type: "tool_use" as const, id: b.id, name: b.name, input: b.input },
-      ),
-    });
+    compactadas.push({ role: "assistant", content: blocosParaHistorico(resposta) });
     const resultados: Anthropic.ToolResultBlockParam[] = [];
     for (const u of usos) {
       const r = await ferramentas.executar(u.name, u.input);

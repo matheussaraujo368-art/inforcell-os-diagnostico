@@ -14,6 +14,34 @@ function descricaoOrigem(s) {
         return h("span", { class: "etiqueta etiqueta--em_diagnostico" }, "Ativo · chave do servidor");
     return h("span", { class: "etiqueta etiqueta--cancelado" }, "Desativado");
 }
+/** Custo estimado de um diagnóstico completo (~4 respostas com consultas): ~60 mil tokens de entrada e ~6 mil de saída. */
+const custoDiagnostico = (m) => (60000 * m.entrada + 6000 * m.saida) / 1000000;
+const dolar = (v) => `US$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: v < 0.1 ? 3 : 2, maximumFractionDigits: v < 0.1 ? 3 : 2 })}`;
+const precoCurto = (m) => `US$ ${m.entrada.toLocaleString("pt-BR")} / ${m.saida.toLocaleString("pt-BR")}`;
+/** Seletor agrupado + cartão com os detalhes do modelo escolhido. */
+function seletorModelo(s) {
+    const conhecidos = new Set(s.catalogo.map((m) => m.id));
+    const daConta = new Set(modelosDaConta);
+    const disponivel = (id) => modelosDaConta.length === 0 || daConta.has(id);
+    const opcao = (m) => h("option", { value: m.id, disabled: !disponivel(m.id) && m.id !== s.modelo }, `${m.nome}${m.id === s.modeloPadrao ? " (padrão)" : ""} — ${precoCurto(m)}${disponivel(m.id) ? "" : " · indisponível nesta chave"}`);
+    const extras = [...new Set([s.modelo, ...modelosDaConta])].filter((id) => !conhecidos.has(id));
+    const select = h("select", { name: "modelo", id: "config-modelo" }, h("optgroup", { label: "Atuais (recomendados)" }, s.catalogo.filter((m) => m.grupo === "atual").map(opcao)), h("optgroup", { label: "Gerações anteriores (não recomendadas)" }, s.catalogo.filter((m) => m.grupo === "anterior").map(opcao)), extras.length > 0 && h("optgroup", { label: "Outros disponíveis na sua chave" }, extras.map((id) => h("option", { value: id }, id))));
+    select.value = s.modelo;
+    const detalhe = h("div", { class: "modelo-detalhe", "aria-live": "polite" });
+    const atualizar = () => {
+        const m = s.catalogo.find((x) => x.id === select.value);
+        if (!m) {
+            detalhe.replaceChildren(h("p", { class: "item__sub" }, "Modelo fora do catálogo: preço e detalhes no console da Anthropic."));
+            return;
+        }
+        detalhe.replaceChildren(h("div", { class: "modelo-detalhe__topo" }, h("strong", {}, m.nome), h("span", { class: `selo-modelo selo-modelo--${m.grupo}` }, m.grupo === "atual" ? "Atual" : "Geração anterior"), h("span", { class: "selo-modelo" }, m.velocidade)), h("p", {}, m.descricao), h("dl", { class: "modelo-detalhe__numeros" }, h("div", {}, h("dt", {}, "Entrada"), h("dd", {}, `US$ ${m.entrada.toLocaleString("pt-BR")}`), h("span", {}, "por milhão de tokens")), h("div", {}, h("dt", {}, "Saída"), h("dd", {}, `US$ ${m.saida.toLocaleString("pt-BR")}`), h("span", {}, "por milhão de tokens")), h("div", { class: "modelo-detalhe__destaque" }, h("dt", {}, "Diagnóstico completo"), h("dd", {}, `≈ ${dolar(custoDiagnostico(m))}`), h("span", {}, "estimativa"))));
+    };
+    select.addEventListener("change", atualizar);
+    atualizar();
+    return h("div", { class: "campo" }, h("label", { class: "campo__rotulo", for: "config-modelo" }, "Modelo"), select, detalhe, h("span", { class: "campo__ajuda" }, modelosDaConta.length
+        ? "A lista foi conferida com a sua chave. Valores do site da Anthropic; o custo real aparece em console.anthropic.com > Usage."
+        : "Clique em Testar conexão para conferir quais modelos a sua chave pode usar."));
+}
 export async function telaConfiguracoes(el) {
     if (!pode.configurar()) {
         preencher(el, cabecalhoTela("Configurações"), caixaAviso("Somente o administrador pode alterar as configurações."));
@@ -23,7 +51,6 @@ export async function telaConfiguracoes(el) {
         const s = situacao ?? (await api.get("/configuracoes/ia"));
         const areaErro = h("div", {});
         // ----- formulário: chave + modelo -----
-        const opcoesModelo = [...new Set([s.modelo, ...(modelosDaConta.length ? modelosDaConta : s.modelosSugeridos)])];
         const campoChave = campo({
             rotulo: s.chaveMascarada ? "Trocar a chave da API" : "Chave da API da Anthropic",
             nome: "chave",
@@ -32,13 +59,7 @@ export async function telaConfiguracoes(el) {
             ajuda: s.chaveMascarada ? "Deixe em branco para manter a chave atual." : 'Começa com "sk-ant-". Veja abaixo como criar.',
             atributos: { autocomplete: "off", spellcheck: "false", placeholder: "sk-ant-api03-…", maxlength: 300 },
         });
-        const campoModelo = campo({
-            rotulo: "Modelo",
-            nome: "modelo",
-            valor: s.modelo,
-            opcoes: opcoesModelo.map((m) => ({ valor: m, rotulo: m === s.modeloPadrao ? `${m} (padrão)` : m })),
-            ajuda: "Sonnet equilibra qualidade e custo. Opus é o mais capaz e mais caro. Haiku é o mais rápido e barato.",
-        });
+        const campoModelo = seletorModelo(s);
         const botaoSalvar = h("button", { class: "btn btn--primary btn--sm", type: "submit" }, "Salvar e testar");
         const form = h("form", { class: "form" }, campoChave, campoModelo, h("div", { class: "form__acoes" }, botaoSalvar));
         form.addEventListener("submit", (ev) => {

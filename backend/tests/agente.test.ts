@@ -121,9 +121,51 @@ describe("agente de diagnóstico", () => {
     expect(r.mensagemCliente).toContain("{cliente}");
   });
 
-  it("falha com mensagem clara se o modelo não usar ferramenta nenhuma", async () => {
+  it("se a IA responder em texto, pede o registro estruturado e aceita na rodada seguinte", async () => {
+    const chamadas: ChamadaModelo[] = [];
+    definirModeloIA(async (c) => {
+      chamadas.push(structuredClone(c));
+      return chamadas.length === 1
+        ? { content: [{ type: "text", text: "Vou pensar no caso…" }] }
+        : { content: [{ type: "tool_use", id: "f", name: "registrar_orientacao", input: orientacaoFinal }] };
+    });
+    const r = await consultarIA(ctx, [], { ferramentas: ferramentasFalsas() });
+    expect(r.mensagem).toBe(orientacaoFinal.mensagem);
+    expect(JSON.stringify(chamadas[1].messages.at(-1))).toContain("registrar_orientacao");
+  });
+
+  it("desiste com mensagem clara se a IA nunca registrar a orientação", async () => {
     definirModeloIA(async () => ({ content: [{ type: "text", text: "oi" }] }));
-    await expect(consultarIA(ctx, [], { ferramentas: ferramentasFalsas() })).rejects.toThrow(/orientação estruturada/);
+    await expect(consultarIA(ctx, [], { ferramentas: ferramentasFalsas() })).rejects.toThrow(/não concluiu/);
+  });
+
+  it("devolve o raciocínio (thinking) intacto na rodada seguinte", async () => {
+    const chamadas: ChamadaModelo[] = [];
+    const brutos = [
+      { type: "thinking", thinking: "analisando…", signature: "assinatura-123" },
+      { type: "tool_use", id: "t1", name: "buscar_casos_semelhantes", input: {} },
+    ] as unknown as Anthropic.ContentBlockParam[];
+    definirModeloIA(async (c) => {
+      chamadas.push(structuredClone(c));
+      return chamadas.length === 1
+        ? { content: [{ type: "tool_use", id: "t1", name: "buscar_casos_semelhantes", input: {} }], brutos }
+        : { content: [{ type: "tool_use", id: "f", name: "registrar_orientacao", input: orientacaoFinal }] };
+    });
+    await consultarIA(ctx, [], { ferramentas: ferramentasFalsas() });
+    const assistente = chamadas[1].messages.find((m) => m.role === "assistant")!;
+    expect(JSON.stringify(assistente.content)).toContain("assinatura-123");
+  });
+
+  it("na última rodada oferece só a ferramenta final", async () => {
+    const ferramentasPorRodada: string[][] = [];
+    definirModeloIA(async (c) => {
+      ferramentasPorRodada.push(c.tools.map((t) => t.name));
+      if (c.tools.length === 1) return { content: [{ type: "tool_use", id: "f", name: "registrar_orientacao", input: orientacaoFinal }] };
+      return { content: [{ type: "tool_use", id: `t${ferramentasPorRodada.length}`, name: "buscar_casos_semelhantes", input: {} }] };
+    });
+    await consultarIA(ctx, [], { ferramentas: ferramentasFalsas() });
+    expect(ferramentasPorRodada.at(-1)).toEqual(["registrar_orientacao"]);
+    expect(ferramentasPorRodada[0]).toContain("buscar_casos_semelhantes");
   });
 });
 
