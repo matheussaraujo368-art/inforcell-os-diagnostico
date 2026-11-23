@@ -849,3 +849,70 @@ a.lista-status__link:hover { background: var(--surface-2); }
 .modelo-detalhe__destaque { border-color: rgba(25, 230, 193, 0.4) !important; }
 .modelo-detalhe__destaque dd { color: var(--accent); }
 @media (max-width: 560px) { .modelo-detalhe__numeros { grid-template-columns: 1fr; } }
+
+
+/* =====================================================================
+   GRID DE 12 COLUNAS — layouts do sistema (ver seção 8 de styles.css)
+   ===================================================================== */
+.colunas, .indicadores, .status-grade, .nova-os, .grade-2, .perfis-resumo, .perfis-escolha, .chat, .form--grade {
+  display: grid;
+  grid-template-columns: repeat(var(--colunas), minmax(0, 1fr));
+  column-gap: var(--calha);
+}
+.colunas > *, .indicadores > *, .status-grade > *, .nova-os > *, .grade-2 > *, .perfis-resumo > *, .perfis-escolha > *, .chat > *, .form--grade > * {
+  min-width: 0;
+  grid-column: span 12;
+}
+
+.colunas__principal, .nova-os__etapas { grid-column: span 8; }
+.colunas__lado, .nova-os > .resumo-os { grid-column: span 4; }
+.indicadores > *, .status-grade > * { grid-column: span 3; }
+.grade-2 > * { grid-column: span 6; }
+.perfis-resumo > *, .perfis-escolha > * { grid-column: span 4; }
+.chat-lateral { grid-column: span 3; }
+.chat-principal { grid-column: span 9; }
+.form--grade > .campo { grid-column: span 3; }
+.form--grade > .campo:has(textarea) { grid-column: span 6; }
+
+/* O painel de status vira uma faixa sem moldura para os cartões caírem nas colunas da página */
+.painel.painel--status { padding: 0; background: transparent; border: 0; box-shadow: none; }
+
+@media (max-width: 980px) {
+  .colunas__principal, .colunas__lado, .nova-os__etapas, .nova-os > .resumo-os { grid-column: span 12; }
+}
+@media (max-width: 900px) {
+  .indicadores > *, .status-grade > *, .form--grade > .campo, .form--grade > .campo:has(textarea) { grid-column: span 6; }
+}
+@media (max-width: 860px) {
+  .chat-lateral, .chat-principal, .perfis-escolha > * { grid-column: span 12; }
+}
+@media (max-width: 600px) {
+  .grade-2 > * { grid-column: span 12; }
+}
+@media (max-width: 560px) {
+  .form--grade > .campo, .form--grade > .campo:has(textarea) { grid-column: span 12; }
+  .indicadores > *, .status-grade > * { grid-column: span 6; }
+  .perfis-resumo > * { grid-column: span 4; }
+}
+.indicadores, .status-grade { row-gap: 16px; }
+
+/* Cabeçalho: o menu nunca quebra no meio; quando não cabe, vira uma faixa rolável abaixo do logo */
+.app-nav { flex-wrap: nowrap; gap: 4px 18px; min-width: 0; }
+.app-nav__link { white-space: nowrap; font-size: 0.8rem; }
+@media (max-width: 1280px) {
+  .app-nav { order: 3; flex-basis: 100%; overflow-x: auto; scrollbar-width: none; border-top: 1px solid var(--border); margin-top: -4px; }
+  .app-nav::-webkit-scrollbar { display: none; }
+  .app-usuario { margin-left: auto; }
+}
+@media (max-width: 560px) {
+  .app-topo { column-gap: 10px; }
+  .app-usuario { gap: 8px; }
+  .app-usuario__nome { max-width: 96px; }
+  .app-usuario__detalhe { max-width: 96px; }
+  .app-usuario .btn { margin-left: 0; padding-inline: 10px; }
+  .logo__text { font-size: 0.95rem; }
+}
+@media (max-width: 420px) {
+  /* Celular estreito: só o avatar (o nome aparece ao tocar/passar o mouse) */
+  .app-usuario__texto { display: none; }
+}

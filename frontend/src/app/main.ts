@@ -68,7 +68,7 @@ function cabecalho(caminho: string): HTMLElement {
       h(
         "div",
         { class: "app-usuario" },
-        h("span", { class: `avatar avatar--mini avatar--${u.perfil.toLowerCase()}`, "aria-hidden": "true" }, iniciais(u.nome)),
+        h("span", { class: `avatar avatar--mini avatar--${u.perfil.toLowerCase()}`, title: `${u.nome} · ${empresaAtual()?.nome ?? ""}`, "aria-hidden": "true" }, iniciais(u.nome)),
         h(
           "span",
           { class: "app-usuario__texto" },

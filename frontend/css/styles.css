@@ -26,6 +26,9 @@
   --radius: 6px;
   --radius-lg: 10px;
   --container: 1160px;
+  /* Grid de 12 colunas (padrão de layout de todas as telas) */
+  --colunas: 12;
+  --calha: 24px; /* espaço fixo entre colunas */
   --gutter: clamp(16px, 4vw, 32px);
   --section-y: clamp(64px, 9vw, 112px);
   --header-h: 68px;
@@ -681,4 +684,69 @@ strong { color: var(--text); font-weight: 600; }
   .hero__cta .btn { width: 100%; }
   .footer__grid { grid-template-columns: 1fr; }
   .status-pill { font-size: 0.66rem; }
+}
+
+
+/* =====================================================================
+   8. GRID DE 12 COLUNAS
+   Todas as páginas usam 12 colunas com calha fixa (--calha). Cada bloco diz quantas
+   colunas ocupa. Pontos de quebra: até 1024px (tablet largo), até 900px (tablet) e
+   até 560px (celular). Utilitários: .grade-12 + .col-1 … .col-12, .col-tab-N, .col-cel-N.
+   ===================================================================== */
+.grade-12,
+.hero__grid, .stats, .cards--2, .cards--4, .steps, .features, .plans, .faq, .footer__grid {
+  display: grid;
+  grid-template-columns: repeat(var(--colunas), minmax(0, 1fr));
+  column-gap: var(--calha);
+}
+.grade-12 > *, .hero__grid > *, .stats > *, .cards > *, .steps > *, .features > *, .plans > *, .faq > *, .footer__grid > * { min-width: 0; }
+
+.col-1 { grid-column: span 1; } .col-2 { grid-column: span 2; } .col-3 { grid-column: span 3; }
+.col-4 { grid-column: span 4; } .col-5 { grid-column: span 5; } .col-6 { grid-column: span 6; }
+.col-7 { grid-column: span 7; } .col-8 { grid-column: span 8; } .col-9 { grid-column: span 9; }
+.col-10 { grid-column: span 10; } .col-11 { grid-column: span 11; } .col-12 { grid-column: span 12; }
+
+/* Página inicial */
+.hero__grid > * { grid-column: span 6; }
+.stats > * { grid-column: span 3; }
+.cards--2 > * { grid-column: span 6; }
+.cards--4 > * { grid-column: span 3; }
+.steps > * { grid-column: span 3; }
+.features > * { grid-column: span 4; }
+.plans > * { grid-column: span 4; }
+.faq > * { grid-column: span 6; }
+.footer__grid > * { grid-column: span 2; }
+.footer__grid > :first-child { grid-column: span 6; }
+
+@media (max-width: 1024px) {
+  .col-tab-6 { grid-column: span 6; } .col-tab-12 { grid-column: span 12; }
+  .cards--4 > *, .steps > *, .features > * { grid-column: span 6; }
+  .footer__grid > *, .footer__grid > :first-child { grid-column: span 6; }
+}
+@media (max-width: 900px) {
+  .hero__grid > *, .cards--2 > *, .plans > *, .faq > * { grid-column: span 12; }
+  .stats > * { grid-column: span 6; }
+}
+@media (max-width: 560px) {
+  [class*="col-"]:not([class*="col-cel-"]) { grid-column: span 12; }
+  .col-cel-6 { grid-column: span 6; } .col-cel-12 { grid-column: span 12; }
+  .cards--4 > *, .steps > *, .features > *, .footer__grid > *, .footer__grid > :first-child { grid-column: span 12; }
+}
+
+/* Sobreposição das 12 colunas (Alt+G) — para conferir o alinhamento na apresentação */
+.grade-sobreposicao { position: fixed; inset: 0; z-index: 9999; pointer-events: none; }
+.grade-sobreposicao .container { height: 100%; display: grid; grid-template-columns: repeat(var(--colunas), minmax(0, 1fr)); column-gap: var(--calha); }
+.grade-sobreposicao__coluna {
+  position: relative;
+  background: rgba(255, 64, 129, 0.12);
+  border-inline: 1px solid rgba(255, 64, 129, 0.5);
+}
+.grade-sobreposicao__coluna span {
+  position: absolute; top: calc(var(--header-h) + 6px); left: 50%; transform: translateX(-50%);
+  font: 700 11px var(--font-mono); color: #ff4081; background: rgba(11, 15, 20, 0.85); padding: 1px 5px; border-radius: 4px;
+}
+.grade-selo {
+  position: fixed; left: 16px; bottom: 16px; z-index: 10000;
+  font: 600 12px var(--font-mono); color: #fff; background: #ff4081;
+  padding: 6px 10px; border-radius: 999px; box-shadow: 0 6px 20px -6px rgba(255, 64, 129, 0.7);
 }

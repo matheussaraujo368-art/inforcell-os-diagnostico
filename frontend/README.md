@@ -80,3 +80,20 @@ A página inicial apresenta o produto e leva às telas internas pelo botão Entr
 - **Responsividade:** mobile-first com breakpoints em 1024, 900 e 560 px; menu hambúrguer no celular; sem rolagem horizontal.
 - **Organização:** CSS dividido em tokens/base/layout/componentes/seções/animações; classes no padrão BEM; TypeScript em `strict` com funções pequenas por responsabilidade.
 - **Progressive enhancement:** sem JavaScript o conteúdo continua visível (animações só são ativadas com a classe `js`).
+
+## Grid de 12 colunas
+
+Todas as telas (página inicial e sistema) seguem um grid de **12 colunas** com espaço fixo de **24px** entre elas (`--colunas` e `--calha` em `css/styles.css`, seção 8).
+
+| Layout | Colunas (computador) |
+|---|---|
+| Formulário + resumo (Nova OS, Clientes, Equipe), detalhe da OS, diagnóstico, Configurações | 8 + 4 |
+| Cartões do painel e indicadores | 3 + 3 + 3 + 3 |
+| Contadores de perfil, escolha de perfil, recursos e planos da página inicial | 4 + 4 + 4 |
+| Assistente IA (conversas + chat) | 3 + 9 |
+| Rodapé da página inicial | 6 + 2 + 2 + 2 |
+
+Pontos de quebra: até **1024px** e **900px** (tablet: blocos em 6 ou 12 colunas) e até **560px** (celular: 12 colunas, ou seja, um bloco por linha).
+Utilitários para novos layouts: `.grade-12` com `.col-1` … `.col-12` (e `.col-tab-6/12`, `.col-cel-6/12`).
+
+**Ver as colunas:** aperte **Alt+G** em qualquer tela (ou abra o endereço com `?grade=1`). Aperte de novo para esconder.
