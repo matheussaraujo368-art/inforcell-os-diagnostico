@@ -3,13 +3,28 @@ import { consultarSaude, entrar } from "../api.js";
 import { definirUrlApi, urlApi, urlPadrao } from "../config.js";
 import { aoEnviar, caixaAviso, caixaErro, caixaOk, campo, h } from "../dom.js";
 import { irPara } from "../nav.js";
+import { botaoAcesso, comIcone, ICONE, layoutAcesso, recursosSenha, vitrine } from "./acesso.js";
+// ---------- Tela ----------
 export function telaLogin(el, destino) {
-    const form = h("form", { class: "form" }, campo({ rotulo: "E-mail", nome: "email", tipo: "email", obrigatorio: true, atributos: { autocomplete: "username", autofocus: true } }), campo({ rotulo: "Senha", nome: "senha", tipo: "password", obrigatorio: true, atributos: { autocomplete: "current-password" } }), h("button", { class: "btn btn--primary btn--block", type: "submit" }, "Entrar"));
+    const campoEmail = campo({ rotulo: "E-mail", nome: "email", tipo: "email", obrigatorio: true, atributos: { autocomplete: "username", autofocus: true, placeholder: "voce@assistencia.com" } });
+    const campoSenha = campo({ rotulo: "Senha", nome: "senha", tipo: "password", obrigatorio: true, atributos: { autocomplete: "current-password", placeholder: "Sua senha" } });
+    comIcone(campoEmail, ICONE.email);
+    const senha = comIcone(campoSenha, ICONE.cadeado);
+    recursosSenha(campoSenha, senha);
+    const botao = botaoAcesso("Entrar");
+    const form = h("form", { class: "form" }, campoEmail, campoSenha, botao);
     aoEnviar(form, async (d) => {
         await entrar(d.email, d.senha);
         irPara(destino);
     }, "Entrando…");
-    el.replaceChildren(h("div", { class: "login" }, h("p", { class: "eyebrow" }, "// inforcell os"), h("h1", { class: "tela__titulo", tabindex: "-1" }, "Acessar o sistema"), form, h("p", { class: "login__alternar" }, "Ainda não tem conta? ", h("a", { href: "#/cadastro" }, "Cadastrar assistência")), configuracaoApi(), h("p", { class: "login__voltar" }, h("a", { href: "index.html" }, "← Voltar à página inicial"))));
+    el.replaceChildren(layoutAcesso(vitrineLogin(), h("p", { class: "eyebrow" }, "// inforcell os"), h("h1", { class: "tela__titulo", tabindex: "-1" }, "Acessar o sistema"), h("p", { class: "acesso__subtitulo" }, "Entre com o e-mail e a senha da sua assistência."), form, h("div", { class: "acesso__divisor", role: "presentation" }, h("span", {}, "ou")), h("p", { class: "login__alternar acesso__alternar" }, "Ainda não tem conta? ", h("a", { href: "#/cadastro" }, "Cadastrar assistência")), configuracaoApi(), h("p", { class: "login__voltar" }, h("a", { href: "index.html" }, "← Voltar à página inicial"))));
+}
+function vitrineLogin() {
+    return vitrine(["Do sintoma à causa, ", "guiado por IA"], "Ordens de serviço e diagnóstico de bancada no mesmo lugar, para celulares e computadores.", [
+        { icone: ICONE.agente, titulo: "Agente de diagnóstico", texto: "Consulta casos, base e preços da sua assistência." },
+        { icone: ICONE.os, titulo: "Ordens de serviço", texto: "Do balcão à entrega, com histórico e comprovante." },
+        { icone: ICONE.camera, titulo: "Assistente de bancada", texto: "Pergunte com foto, vídeo ou voz." },
+    ], h("div", { class: "acesso__demo", "aria-hidden": "true" }, h("div", { class: "acesso__demo-topo" }, h("i", {}), h("i", {}), h("i", {}), h("span", {}, "os-0042 · iPhone 11")), h("div", { class: "acesso__demo-passos" }, h("span", {}, "› 5 casos semelhantes"), h("span", {}, "› 4 reparos e preços")), h("p", {}, h("strong", {}, "Próximo teste: "), "consumo na fonte ao pressionar Power"), h("div", { class: "acesso__demo-barra" }, h("span", {}))));
 }
 function configuracaoApi() {
     const resultado = h("div", { "aria-live": "polite" });
