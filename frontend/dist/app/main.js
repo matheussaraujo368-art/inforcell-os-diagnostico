@@ -1,4 +1,5 @@
 /** Inforcell OS — roteador e estrutura das telas internas (app.html). */
+import { iniciais } from "./componentes.js";
 import { definirAoExpirar, empresaAtual, pode, sair, usuarioAtual, validarSessao } from "./api.js";
 import { caixaErro, caixaOk, h } from "./dom.js";
 import { consumirAviso, definirAviso, irPara, registrarRenderizador } from "./nav.js";
@@ -30,7 +31,11 @@ function cabecalho(caminho) {
     const link = (href, texto, prefixo) => h("a", { class: "app-nav__link", href, "aria-current": caminho.startsWith(prefixo) ? "page" : undefined }, texto);
     return h("div", { class: "container app-topo" }, h("a", { class: "logo", href: u ? INICIO : "index.html", "aria-label": "Inforcell OS, início" }, h("span", { class: "logo__icon", "aria-hidden": "true" }), h("span", { class: "logo__text" }, "INFORCELL", h("span", { class: "accent" }, " OS"))), u &&
         h("nav", { class: "app-nav", "aria-label": "Navegação principal" }, link("#/painel", "Painel", "/painel"), link("#/ordens", "Ordens de Serviço", "/ordens"), link("#/clientes", "Clientes", "/clientes"), pode.gerirEquipe() && link("#/equipe", "Equipe", "/equipe"), pode.configurar() && link("#/configuracoes", "Configurações", "/configuracoes")), u &&
-        h("div", { class: "app-usuario" }, h("span", { class: "app-usuario__empresa" }, empresaAtual()?.nome), h("span", {}, u.nome, " ", h("span", { class: "tag" }, ROTULO_PERFIL[u.perfil])), h("button", {
+        h("div", { class: "app-usuario" }, h("span", { class: `avatar avatar--mini avatar--${u.perfil.toLowerCase()}`, "aria-hidden": "true" }, iniciais(u.nome)), h("span", { class: "app-usuario__texto" }, h("strong", { class: "app-usuario__nome" }, u.nome), h("span", { class: "app-usuario__detalhe" }, 
+        // Não repete o perfil quando o nome da conta já é o próprio perfil (ex.: "Administrador").
+        [u.nome.trim().toLowerCase() === ROTULO_PERFIL[u.perfil].toLowerCase() ? null : ROTULO_PERFIL[u.perfil], empresaAtual()?.nome]
+            .filter(Boolean)
+            .join(" · "))), h("button", {
             class: "btn btn--outline btn--sm",
             type: "button",
             onClick: () => {

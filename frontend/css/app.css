@@ -28,7 +28,12 @@
 }
 .app-nav__link:hover { color: var(--text); }
 .app-nav__link[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
-.app-usuario { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 0.9rem; }
+.app-usuario { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; }
+.app-usuario__texto { display: grid; line-height: 1.25; min-width: 0; }
+.app-usuario__nome { font-size: 0.88rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+.app-usuario__detalhe { font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.app-usuario .btn { margin-left: 6px; }
+.avatar.avatar--mini { width: 34px; height: 34px; font-size: 0.75rem; }
 .app-usuario__empresa { font-family: var(--font-mono); font-size: 0.82rem; color: var(--accent); overflow-wrap: anywhere; }
 
 .app-principal { padding-block: 28px 64px; }

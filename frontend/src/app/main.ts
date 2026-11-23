@@ -1,4 +1,5 @@
 /** Inforcell OS — roteador e estrutura das telas internas (app.html). */
+import { iniciais } from "./componentes.js";
 import { definirAoExpirar, empresaAtual, pode, sair, usuarioAtual, validarSessao } from "./api.js";
 import { caixaErro, caixaOk, h } from "./dom.js";
 import { consumirAviso, definirAviso, irPara, registrarRenderizador } from "./nav.js";
@@ -63,8 +64,20 @@ function cabecalho(caminho: string): HTMLElement {
       h(
         "div",
         { class: "app-usuario" },
-        h("span", { class: "app-usuario__empresa" }, empresaAtual()?.nome),
-        h("span", {}, u.nome, " ", h("span", { class: "tag" }, ROTULO_PERFIL[u.perfil])),
+        h("span", { class: `avatar avatar--mini avatar--${u.perfil.toLowerCase()}`, "aria-hidden": "true" }, iniciais(u.nome)),
+        h(
+          "span",
+          { class: "app-usuario__texto" },
+          h("strong", { class: "app-usuario__nome" }, u.nome),
+          h(
+            "span",
+            { class: "app-usuario__detalhe" },
+            // Não repete o perfil quando o nome da conta já é o próprio perfil (ex.: "Administrador").
+            [u.nome.trim().toLowerCase() === ROTULO_PERFIL[u.perfil].toLowerCase() ? null : ROTULO_PERFIL[u.perfil], empresaAtual()?.nome]
+              .filter(Boolean)
+              .join(" · "),
+          ),
+        ),
         h(
           "button",
           {
