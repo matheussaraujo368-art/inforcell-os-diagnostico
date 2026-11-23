@@ -527,3 +527,102 @@ a.lista-status__link:hover { background: var(--surface-2); }
 
 /* Elementos com o atributo hidden somem mesmo quando o componente define display */
 .btn[hidden], [hidden] { display: none !important; }
+
+/* ---------- Equipe ---------- */
+/* Uma cor por perfil */
+.avatar--admin, .perfil-resumo--admin, .perfil-opcao--admin { --perfil: #f5a524; }
+.avatar--atendente, .perfil-resumo--atendente, .perfil-opcao--atendente { --perfil: #60a5fa; }
+.avatar--tecnico, .perfil-resumo--tecnico, .perfil-opcao--tecnico { --perfil: #19e6c1; }
+.avatar.avatar--admin, .avatar.avatar--atendente, .avatar.avatar--tecnico {
+  color: var(--perfil, var(--accent));
+  background: color-mix(in srgb, var(--perfil, var(--accent)) 14%, transparent);
+  border-color: color-mix(in srgb, var(--perfil, var(--accent)) 40%, transparent);
+}
+
+.perfis-resumo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.perfil-resumo {
+  display: flex; align-items: baseline; gap: 10px; padding: 14px 16px;
+  border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border);
+  border-top: 3px solid var(--perfil);
+}
+.perfil-resumo__valor { font-family: var(--font-mono); font-size: 1.6rem; font-weight: 700; color: var(--perfil); line-height: 1; }
+.perfil-resumo__rotulo { color: var(--muted); font-size: 0.88rem; }
+
+.membros { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.membro {
+  display: grid; grid-template-columns: 44px minmax(0, 1fr) 76px 170px 290px; align-items: center; gap: 16px;
+  padding: 12px 16px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border);
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.membro:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.membro--inativo { opacity: 0.6; }
+.membro__principal { display: grid; gap: 2px; min-width: 0; }
+.membro__nome { display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.membro__principal .item__sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.membro__acoes { display: flex; gap: 6px; justify-content: flex-end; min-width: 0; }
+.membro__acoes .btn { white-space: nowrap; }
+.membro__perfil {
+  min-height: 38px; padding: 6px 10px; font: inherit; font-size: 0.86rem;
+  color: var(--text); background: var(--bg-alt); border: 1px solid var(--border-strong); border-radius: var(--radius);
+}
+.membro__perfil:disabled { opacity: 0.6; cursor: not-allowed; }
+.membro__perfil:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.selo-voce { font-size: 0.68rem; font-weight: 600; padding: 2px 7px; border-radius: 999px; color: var(--accent); background: var(--accent-soft); }
+
+.situacao { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+.situacao::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.situacao--ativo { color: #4ade80; }
+
+/* Escolha de perfil em cartões */
+.perfis-escolha { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.perfil-opcao { position: relative; }
+.perfil-opcao input { position: absolute; opacity: 0; pointer-events: none; }
+.perfil-opcao__caixa {
+  display: grid; gap: 4px; height: 100%; padding: 12px 14px; cursor: pointer;
+  border-radius: var(--radius); background: var(--bg-alt); border: 1px solid var(--border-strong);
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.perfil-opcao__caixa strong { color: var(--text); font-size: 0.92rem; }
+.perfil-opcao__caixa span { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.perfil-opcao__caixa:hover { border-color: #3a4d60; }
+.perfil-opcao input:checked + .perfil-opcao__caixa {
+  border-color: var(--perfil); background: color-mix(in srgb, var(--perfil) 10%, var(--bg-alt));
+  box-shadow: inset 3px 0 0 var(--perfil);
+}
+.perfil-opcao input:checked + .perfil-opcao__caixa strong { color: var(--perfil); }
+.perfil-opcao input:focus-visible + .perfil-opcao__caixa { outline: 2px solid var(--perfil); outline-offset: 2px; }
+
+/* Senha */
+.senha-linha { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.forca { display: block; height: 5px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.forca__barra { display: block; height: 100%; width: 0; border-radius: inherit; transition: width 0.25s var(--ease), background 0.25s; }
+.forca[data-nivel="1"] .forca__barra { width: 33%; background: var(--danger); }
+.forca[data-nivel="2"] .forca__barra { width: 66%; background: var(--warn); }
+.forca[data-nivel="3"] .forca__barra { width: 100%; background: #4ade80; }
+
+/* Acesso para entregar à pessoa */
+.cartao-acesso {
+  display: grid; gap: 10px; margin-bottom: 16px; padding: 18px 20px;
+  border-radius: var(--radius-lg); border: 1px solid rgba(25, 230, 193, 0.45);
+  background: linear-gradient(135deg, rgba(25, 230, 193, 0.1), transparent 60%), var(--surface);
+}
+.cartao-acesso h2 { font-size: 1rem; margin: 0; }
+.cartao-acesso__dados { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; }
+.cartao-acesso__dados dt { color: var(--muted); font-size: 0.82rem; }
+.cartao-acesso__dados dd { margin: 0; }
+.cartao-acesso__senha { font-size: 1.05rem; letter-spacing: 0.06em; color: var(--accent); }
+
+@media (max-width: 860px) {
+  .membro { grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px 12px; }
+  .membro__perfil { grid-column: 2; }
+  .membro__acoes { grid-column: 2 / -1; justify-content: flex-start; flex-wrap: wrap; }
+  .perfis-escolha { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .perfis-resumo { gap: 8px; }
+  .perfil-resumo { flex-direction: column; gap: 4px; padding: 10px 12px; }
+  .perfil-resumo__valor { font-size: 1.3rem; }
+  .perfil-resumo__rotulo { font-size: 0.78rem; }
+  .senha-linha { grid-template-columns: 1fr 1fr; }
+  .senha-linha input { grid-column: 1 / -1; }
+}
