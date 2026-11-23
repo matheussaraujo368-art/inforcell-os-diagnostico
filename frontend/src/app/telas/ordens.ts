@@ -120,8 +120,10 @@ export async function telaNovaOrdem(el: HTMLElement, { consulta }: ContextoTela)
   const seletorEquipamento = h("select", { name: "equipamentoId", required: true, disabled: true });
   const avisoEquipamento = h("span", { "aria-live": "polite" });
 
+  let equipamentosAtuais: Equipamento[] = [];
   const carregarEquipamentos = async (preferido: number | null): Promise<void> => {
     const clienteId = Number(seletorCliente.value);
+    equipamentosAtuais = [];
     avisoEquipamento.replaceChildren();
     if (!clienteId) {
       seletorEquipamento.replaceChildren(h("option", { value: "" }, "Escolha o cliente primeiro"));
@@ -129,6 +131,7 @@ export async function telaNovaOrdem(el: HTMLElement, { consulta }: ContextoTela)
       return;
     }
     const lista = await api.get<Equipamento[]>(`/equipamentos?clienteId=${clienteId}`);
+    equipamentosAtuais = lista;
     seletorEquipamento.replaceChildren(
       h("option", { value: "" }, lista.length ? "Selecione o equipamento" : "Nenhum equipamento cadastrado"),
       ...lista.map((e) => h("option", { value: e.id }, `${e.marca} ${e.modelo}${e.imei ? ` · IMEI ${e.imei}` : ""}`)),
@@ -141,6 +144,7 @@ export async function telaNovaOrdem(el: HTMLElement, { consulta }: ContextoTela)
         h("span", { class: "campo__ajuda" }, "Este cliente ainda não tem equipamento. ", h("a", { href: `#/clientes/${clienteId}` }, "Cadastrar equipamento")),
       );
     }
+    seletorEquipamento.dispatchEvent(new Event("change", { bubbles: true }));
   };
 
   const carregarClientes = async (busca: string, preferido: number | null): Promise<void> => {
@@ -175,55 +179,263 @@ export async function telaNovaOrdem(el: HTMLElement, { consulta }: ContextoTela)
     },
   });
 
+  // ---------- Etapa 1: cliente ----------
+  buscaCliente.classList.add("busca__entrada");
+  const etapaCliente = etapaForm(
+    1,
+    "Cliente",
+    "Busque pelo nome, CPF ou telefone e selecione.",
+    h("a", { class: "btn btn--outline btn--sm", href: "#/clientes" }, "+ Novo cliente"),
+    h(
+      "div",
+      { class: "grade-2" },
+      h("label", { class: "campo" }, h("span", { class: "campo__rotulo" }, "Buscar"), h("span", { class: "busca" }, iconeBusca(), buscaCliente)),
+      h("label", { class: "campo" }, rotuloObrig("Cliente"), seletorCliente),
+    ),
+  );
+
+  // ---------- Etapa 2: aparelho ----------
+  const fichaAparelho = h("div", { class: "ficha-aparelho", hidden: true });
+  const etapaAparelho = etapaForm(
+    2,
+    "Aparelho",
+    "Os aparelhos do cliente aparecem aqui.",
+    null,
+    h("label", { class: "campo" }, rotuloObrig("Equipamento"), seletorEquipamento, avisoEquipamento),
+    fichaAparelho,
+  );
+
+  // ---------- Etapa 3: defeito e recebimento ----------
+  const defeito = h("textarea", {
+    name: "defeitoRelatado",
+    required: true,
+    minlength: 3,
+    rows: 4,
+    placeholder: "Descreva o que o cliente relatou. Ex.: não liga depois que caiu; tela com listras…",
+  }) as HTMLTextAreaElement;
+  const acessorios = h("input", { name: "acessorios", maxlength: 255, placeholder: "Capa, chip, carregador…" }) as HTMLInputElement;
+  const etapaDefeito = etapaForm(
+    3,
+    "Defeito e recebimento",
+    "Toque nos atalhos para preencher mais rápido.",
+    null,
+    h(
+      "div",
+      { class: "campo" },
+      h("label", { class: "campo__rotulo", for: "nova-os-defeito" }, "Defeito relatado", h("span", { class: "campo__obrig", "aria-hidden": "true" }, " *")),
+      atalhos(["Não liga", "Não carrega", "Tela quebrada", "Touch não funciona", "Sem áudio", "Molhou", "Bateria viciada", "Reiniciando", "Sem sinal", "Câmera"], (t) =>
+        acrescentarTexto(defeito, t, "; "),
+      ),
+      Object.assign(defeito, { id: "nova-os-defeito" }),
+    ),
+    h(
+      "div",
+      { class: "campo" },
+      h("label", { class: "campo__rotulo", for: "nova-os-acessorios" }, "Acessórios entregues"),
+      atalhos(["Capa", "Chip", "Carregador", "Cabo", "Película", "Cartão de memória", "Caixa"], (t) => acrescentarTexto(acessorios, t, ", ")),
+      Object.assign(acessorios, { id: "nova-os-acessorios" }),
+    ),
+  );
+
+  // ---------- Etapa 4: atendimento ----------
+  const seletorTecnico = h(
+    "select",
+    { name: "tecnicoId" },
+    h("option", { value: "" }, "Definir depois"),
+    tecnicos.map((t) => h("option", { value: t.id }, t.nome)),
+  ) as HTMLSelectElement;
+  const previsao = h("input", { type: "date", name: "previsaoEntrega" }) as HTMLInputElement;
+  const prazo = (dias: number): void => {
+    const d = new Date();
+    d.setDate(d.getDate() + dias);
+    previsao.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    previsao.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const etapaAtendimento = etapaForm(
+    4,
+    "Atendimento",
+    "Opcional: pode ser definido depois.",
+    null,
+    h(
+      "div",
+      { class: "grade-2" },
+      h(
+        "label",
+        { class: "campo" },
+        h("span", { class: "campo__rotulo" }, "Técnico responsável"),
+        seletorTecnico,
+        tecnicos.length === 0 &&
+          h("span", { class: "campo__ajuda" }, "Nenhum técnico cadastrado. ", pode.gerirEquipe() ? h("a", { href: "#/equipe" }, "Adicionar na Equipe") : "Peça ao administrador."),
+      ),
+      h(
+        "div",
+        { class: "campo" },
+        h("label", { class: "campo__rotulo", for: "nova-os-previsao" }, "Previsão de entrega"),
+        Object.assign(previsao, { id: "nova-os-previsao" }),
+        h(
+          "div",
+          { class: "atalhos" },
+          [
+            ["Hoje", 0],
+            ["Amanhã", 1],
+            ["3 dias", 3],
+            ["1 semana", 7],
+          ].map(([rotulo, dias]) => h("button", { type: "button", class: "atalho", onClick: () => prazo(Number(dias)) }, String(rotulo))),
+        ),
+      ),
+    ),
+  );
+
+  // ---------- Resumo lateral ----------
+  const linhaResumo = (rotulo: string): { dd: HTMLElement; itens: HTMLElement[] } => {
+    const dd = h("dd", {}, "—");
+    return { dd, itens: [h("dt", {}, rotulo), dd] };
+  };
+  const rCliente = linhaResumo("Cliente");
+  const rAparelho = linhaResumo("Aparelho");
+  const rDefeito = linhaResumo("Defeito");
+  const rTecnico = linhaResumo("Técnico");
+  const rPrevisao = linhaResumo("Previsão");
+  const progresso = h("span", { class: "resumo__progresso-barra" });
+  const contador = h("span", { class: "resumo__contador" });
+  const botaoAbrir = h("button", { class: "btn btn--primary btn--block", type: "submit" }, "Abrir OS") as HTMLButtonElement;
+  const areaErro = h("div", {});
+
+  const textoOpcao = (sel: HTMLSelectElement): string => (sel.value ? sel.selectedOptions[0]?.textContent ?? "" : "");
+  const atualizarResumo = (): void => {
+    const cliente = textoOpcao(seletorCliente as HTMLSelectElement);
+    const aparelho = textoOpcao(seletorEquipamento as HTMLSelectElement);
+    rCliente.dd.textContent = cliente || "—";
+    rAparelho.dd.textContent = aparelho || "—";
+    rDefeito.dd.textContent = defeito.value.trim() || "—";
+    rTecnico.dd.textContent = textoOpcao(seletorTecnico) || "Definir depois";
+    rPrevisao.dd.textContent = previsao.value ? previsao.value.split("-").reverse().join("/") : "—";
+    const feitos = [cliente, aparelho, defeito.value.trim().length >= 3].filter(Boolean).length;
+    progresso.style.width = `${(feitos / 3) * 100}%`;
+    contador.textContent = feitos === 3 ? "Pronta para abrir" : `${feitos} de 3 obrigatórios`;
+    contador.classList.toggle("resumo__contador--ok", feitos === 3);
+
+    // ficha do aparelho escolhido
+    const eq = equipamentosAtuais.find((e) => String(e.id) === (seletorEquipamento as HTMLSelectElement).value);
+    fichaAparelho.hidden = !eq;
+    if (eq) {
+      fichaAparelho.replaceChildren(
+        h("span", { class: "ficha-aparelho__icone" }, iconeAparelho(eq.tipo)),
+        h(
+          "div",
+          {},
+          h("strong", {}, `${eq.marca} ${eq.modelo}`),
+          h(
+            "span",
+            { class: "item__sub" },
+            [ROTULO_TIPO[eq.tipo] ?? eq.tipo, eq.cor, eq.imei && `IMEI ${eq.imei}`, eq.numeroSerie && `Série ${eq.numeroSerie}`].filter(Boolean).join(" · "),
+          ),
+        ),
+      );
+    }
+  };
+
+  const resumo = h(
+    "aside",
+    { class: "resumo-os", "aria-label": "Resumo da OS" },
+    h("h2", {}, "Resumo"),
+    h("div", { class: "resumo__progresso" }, progresso),
+    contador,
+    h("dl", { class: "resumo__lista" }, rCliente.itens, rAparelho.itens, rDefeito.itens, rTecnico.itens, rPrevisao.itens),
+    botaoAbrir,
+    h("a", { class: "btn btn--outline btn--sm btn--block", href: "#/ordens" }, "Cancelar"),
+    areaErro,
+  );
+
   const form = h(
     "form",
-    { class: "form form--grade" },
-    h("label", { class: "campo" }, h("span", { class: "campo__rotulo" }, "Buscar cliente"), buscaCliente),
-    h(
-      "label",
-      { class: "campo" },
-      h("span", { class: "campo__rotulo" }, "Cliente", h("span", { class: "campo__obrig", "aria-hidden": "true" }, " *")),
-      seletorCliente,
-      h("span", { class: "campo__ajuda" }, "Cliente novo? ", h("a", { href: "#/clientes" }, "Cadastre aqui.")),
-    ),
-    h(
-      "label",
-      { class: "campo" },
-      h("span", { class: "campo__rotulo" }, "Equipamento", h("span", { class: "campo__obrig", "aria-hidden": "true" }, " *")),
-      seletorEquipamento,
-      avisoEquipamento,
-    ),
-    campo({ rotulo: "Defeito relatado", nome: "defeitoRelatado", obrigatorio: true, linhas: 3, atributos: { minlength: 3 } }),
-    campo({ rotulo: "Acessórios entregues", nome: "acessorios", atributos: { maxlength: 255, placeholder: "Capa, chip, carregador…" } }),
-    campo({
-      rotulo: "Técnico",
-      nome: "tecnicoId",
-      ajuda: tecnicos.length === 0 ? "Nenhum técnico cadastrado. O administrador pode adicionar na tela Equipe." : undefined,
-      opcoes: [{ valor: "", rotulo: "Definir depois" }, ...tecnicos.map((t) => ({ valor: String(t.id), rotulo: t.nome }))],
-    }),
-    campo({ rotulo: "Previsão de entrega", nome: "previsaoEntrega", tipo: "date" }),
-    areaErroCarga,
-    h("div", { class: "form__acoes" }, h("button", { class: "btn btn--primary", type: "submit" }, "Abrir OS")),
-  );
-  aoEnviar(
-    form,
-    async (d) => {
+    { class: "nova-os" },
+    h("div", { class: "nova-os__etapas" }, etapaCliente, etapaAparelho, etapaDefeito, etapaAtendimento, areaErroCarga),
+    resumo,
+  ) as HTMLFormElement;
+  form.addEventListener("input", atualizarResumo);
+  form.addEventListener("change", atualizarResumo);
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const d = new FormData(form);
+    const valor = (k: string): string => String(d.get(k) ?? "").trim();
+    void ocupado(botaoAbrir, "Abrindo…", areaErro, async () => {
       const os = await api.post<OrdemResumo>("/ordens", {
-        clienteId: Number(d.clienteId),
-        equipamentoId: Number(d.equipamentoId),
-        defeitoRelatado: d.defeitoRelatado,
-        acessorios: ouNulo(d.acessorios),
-        tecnicoId: d.tecnicoId ? Number(d.tecnicoId) : null,
-        previsaoEntrega: dataParaIso(d.previsaoEntrega),
+        clienteId: Number(valor("clienteId")),
+        equipamentoId: Number(valor("equipamentoId")),
+        defeitoRelatado: valor("defeitoRelatado"),
+        acessorios: ouNulo(valor("acessorios")),
+        tecnicoId: valor("tecnicoId") ? Number(valor("tecnicoId")) : null,
+        previsaoEntrega: dataParaIso(valor("previsaoEntrega")),
       });
       definirAviso({ tipo: "ok", texto: `${numeroOS(os.numero)} aberta com sucesso.` });
       irPara(`#/ordens/${os.id}`);
-    },
-    "Abrindo…",
-  );
+    });
+  });
 
   await carregarClientes("", clienteInicial);
-  preencher(el,cabecalhoTela("Nova Ordem de Serviço"), h("section", { class: "painel" }, form));
+  atualizarResumo();
+  preencher(el, cabecalhoTela("Nova Ordem de Serviço"), form);
+}
+
+// ---------- Componentes do formulário de Nova OS ----------
+
+const ROTULO_TIPO: Record<string, string> = { CELULAR: "Celular", TABLET: "Tablet", NOTEBOOK: "Notebook", DESKTOP: "Computador", OUTRO: "Outro" };
+/** Ícone simples do tipo de aparelho (celular/tablet ou computador). */
+function iconeAparelho(tipo: string): HTMLElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.innerHTML =
+    tipo === "CELULAR" || tipo === "TABLET"
+      ? '<rect x="6" y="2.5" width="12" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
+      : '<rect x="4" y="4.5" width="16" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2 19h20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>';
+  return svg as unknown as HTMLElement;
+}
+
+const rotuloObrig = (texto: string): HTMLElement =>
+  h("span", { class: "campo__rotulo" }, texto, h("span", { class: "campo__obrig", "aria-hidden": "true" }, " *"));
+
+function etapaForm(numero: number, titulo: string, descricao: string, acao: HTMLElement | null, ...conteudo: (HTMLElement | false)[]): HTMLElement {
+  return h(
+    "section",
+    { class: "etapa-form" },
+    h(
+      "header",
+      { class: "etapa-form__topo" },
+      h("span", { class: "etapa-form__numero", "aria-hidden": "true" }, numero),
+      h("div", { class: "etapa-form__titulos" }, h("h2", {}, titulo), h("p", {}, descricao)),
+      acao,
+    ),
+    h("div", { class: "etapa-form__corpo" }, ...conteudo),
+  );
+}
+
+/** Botões de atalho que acrescentam um texto ao campo. */
+function atalhos(textos: string[], aoEscolher: (t: string) => void): HTMLElement {
+  return h(
+    "div",
+    { class: "atalhos" },
+    textos.map((t) => h("button", { type: "button", class: "atalho", onClick: () => aoEscolher(t) }, `+ ${t}`)),
+  );
+}
+
+/** Acrescenta o texto ao campo sem repetir e avisa o formulário da mudança. */
+function acrescentarTexto(campoTexto: HTMLInputElement | HTMLTextAreaElement, texto: string, separador: string): void {
+  const atual = campoTexto.value.trim();
+  if (atual.toLowerCase().includes(texto.toLowerCase())) return;
+  campoTexto.value = atual ? `${atual.replace(/[;,.\s]+$/, "")}${separador}${texto}` : texto;
+  campoTexto.dispatchEvent(new Event("input", { bubbles: true }));
+  campoTexto.focus();
+}
+
+function iconeBusca(): HTMLElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "busca__icone");
+  svg.innerHTML = '<circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+  return svg as unknown as HTMLElement;
 }
 
 // ---------- Detalhe ----------

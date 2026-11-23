@@ -361,3 +361,84 @@ a.lista-status__link:hover { background: var(--surface-2); }
   .status-cartao { transition: none; }
   .status-cartao:hover { transform: none; }
 }
+
+/* ---------- Nova OS: etapas + resumo ---------- */
+.nova-os { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.nova-os__etapas { display: grid; gap: 16px; min-width: 0; }
+.nova-os__etapas > div:empty { display: none; }
+
+.etapa-form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.etapa-form__topo { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, var(--surface-2), var(--surface)); }
+.etapa-form__numero {
+  flex: none; display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  font-family: var(--font-mono); font-weight: 700; font-size: 0.85rem;
+  color: var(--accent); background: var(--accent-soft); border: 1px solid rgba(25, 230, 193, 0.35);
+}
+.etapa-form__titulos { flex: 1; min-width: 0; }
+.etapa-form__titulos h2 { font-family: var(--font-sans); font-size: 1rem; font-weight: 600; margin: 0; }
+.etapa-form__titulos p { margin: 2px 0 0; font-size: 0.82rem; color: var(--muted); }
+.etapa-form__corpo { display: grid; gap: 16px; padding: 18px 20px 20px; }
+
+.grade-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+
+/* Campo de busca com ícone */
+.busca { position: relative; display: block; }
+.busca__icone { position: absolute; left: 12px; top: 50%; width: 18px; height: 18px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.campo .busca input { padding-left: 38px; }
+
+/* Visual comum dos campos (mais moderno) */
+.campo input, .campo select, .campo textarea { transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease), background 0.15s var(--ease); }
+.campo input:hover, .campo select:hover, .campo textarea:hover { border-color: #3a4d60; }
+.campo input:focus-visible, .campo select:focus-visible, .campo textarea:focus-visible {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--bg);
+}
+.campo input::placeholder, .campo textarea::placeholder { color: #5b6b7c; }
+.campo select:disabled { opacity: 0.55; cursor: not-allowed; }
+.campo input[type="date"] { color-scheme: dark; }
+
+/* Atalhos (chips) */
+.atalhos { display: flex; flex-wrap: wrap; gap: 6px; }
+.atalho {
+  font: inherit; font-size: 0.78rem; line-height: 1;
+  padding: 7px 11px; border-radius: 999px;
+  color: var(--muted); background: var(--surface-2); border: 1px solid var(--border-strong);
+  cursor: pointer; transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.atalho:hover { color: var(--accent); border-color: rgba(25, 230, 193, 0.5); background: var(--accent-soft); }
+.atalho:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Ficha do aparelho escolhido */
+.ficha-aparelho { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius); background: var(--accent-soft); border: 1px solid rgba(25, 230, 193, 0.3); }
+.ficha-aparelho[hidden] { display: none; }
+.ficha-aparelho__icone { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--surface); color: var(--accent); }
+.ficha-aparelho__icone svg { width: 22px; height: 22px; }
+.ficha-aparelho strong { display: block; }
+
+/* Resumo lateral */
+.resumo-os {
+  position: sticky; top: calc(var(--header-h) + 16px);
+  display: grid; gap: 12px;
+  padding: 20px; border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(25, 230, 193, 0.06), transparent 40%), var(--surface);
+  border: 1px solid var(--border);
+}
+.resumo-os h2 { font-size: 1rem; margin: 0; }
+.resumo__progresso { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.resumo__progresso-barra { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-strong)); transition: width 0.3s var(--ease); }
+.resumo__contador { font-size: 0.8rem; color: var(--muted); }
+.resumo__contador--ok { color: var(--accent); font-weight: 600; }
+.resumo__lista { display: grid; gap: 10px; margin: 4px 0; padding: 14px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.resumo__lista dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.resumo__lista dd { margin: 2px 0 0; font-size: 0.9rem; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.btn--block { width: 100%; justify-content: center; text-align: center; }
+
+@media (max-width: 980px) {
+  .nova-os { grid-template-columns: 1fr; }
+  .resumo-os { position: static; }
+}
+@media (max-width: 600px) {
+  .grade-2 { grid-template-columns: 1fr; }
+  .etapa-form__topo { padding: 14px 16px; flex-wrap: wrap; }
+  .etapa-form__corpo { padding: 16px; }
+}
