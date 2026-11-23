@@ -23,7 +23,7 @@ function seletorModelo(s) {
     const conhecidos = new Set(s.catalogo.map((m) => m.id));
     const daConta = new Set(modelosDaConta);
     const disponivel = (id) => modelosDaConta.length === 0 || daConta.has(id);
-    const opcao = (m) => h("option", { value: m.id, disabled: !disponivel(m.id) && m.id !== s.modelo }, `${m.nome}${m.id === s.modeloPadrao ? " (padrão)" : ""} — ${precoCurto(m)}${disponivel(m.id) ? "" : " · indisponível nesta chave"}`);
+    const opcao = (m) => h("option", { value: m.id, disabled: !disponivel(m.id) && m.id !== s.modelo }, `${m.id === s.modeloPadrao ? "★ " : ""}${m.nome}${m.id === s.modeloPadrao ? " (recomendado)" : ""} — ${precoCurto(m)}${disponivel(m.id) ? "" : " · indisponível nesta chave"}`);
     const extras = [...new Set([s.modelo, ...modelosDaConta])].filter((id) => !conhecidos.has(id));
     const select = h("select", { name: "modelo", id: "config-modelo" }, h("optgroup", { label: "Atuais (recomendados)" }, s.catalogo.filter((m) => m.grupo === "atual").map(opcao)), h("optgroup", { label: "Gerações anteriores (não recomendadas)" }, s.catalogo.filter((m) => m.grupo === "anterior").map(opcao)), extras.length > 0 && h("optgroup", { label: "Outros disponíveis na sua chave" }, extras.map((id) => h("option", { value: id }, id))));
     select.value = s.modelo;
@@ -34,7 +34,7 @@ function seletorModelo(s) {
             detalhe.replaceChildren(h("p", { class: "item__sub" }, "Modelo fora do catálogo: preço e detalhes no console da Anthropic."));
             return;
         }
-        detalhe.replaceChildren(h("div", { class: "modelo-detalhe__topo" }, h("strong", {}, m.nome), h("span", { class: `selo-modelo selo-modelo--${m.grupo}` }, m.grupo === "atual" ? "Atual" : "Geração anterior"), h("span", { class: "selo-modelo" }, m.velocidade)), h("p", {}, m.descricao), h("dl", { class: "modelo-detalhe__numeros" }, h("div", {}, h("dt", {}, "Entrada"), h("dd", {}, `US$ ${m.entrada.toLocaleString("pt-BR")}`), h("span", {}, "por milhão de tokens")), h("div", {}, h("dt", {}, "Saída"), h("dd", {}, `US$ ${m.saida.toLocaleString("pt-BR")}`), h("span", {}, "por milhão de tokens")), h("div", { class: "modelo-detalhe__destaque" }, h("dt", {}, "Diagnóstico completo"), h("dd", {}, `≈ ${dolar(custoDiagnostico(m))}`), h("span", {}, "estimativa"))));
+        detalhe.replaceChildren(h("div", { class: "modelo-detalhe__topo" }, h("strong", {}, m.nome), h("span", { class: `selo-modelo selo-modelo--${m.grupo}` }, m.grupo === "atual" ? "Atual" : "Geração anterior"), m.id === s.modeloPadrao && h("span", { class: "selo-modelo selo-modelo--atual" }, "★ Recomendado"), h("span", { class: "selo-modelo" }, m.velocidade)), h("p", {}, m.descricao), h("dl", { class: "modelo-detalhe__numeros" }, h("div", {}, h("dt", {}, "Entrada"), h("dd", {}, `US$ ${m.entrada.toLocaleString("pt-BR")}`), h("span", {}, "por milhão de tokens")), h("div", {}, h("dt", {}, "Saída"), h("dd", {}, `US$ ${m.saida.toLocaleString("pt-BR")}`), h("span", {}, "por milhão de tokens")), h("div", { class: "modelo-detalhe__destaque" }, h("dt", {}, "Diagnóstico completo"), h("dd", {}, `≈ ${dolar(custoDiagnostico(m))}`), h("span", {}, "estimativa"))));
     };
     select.addEventListener("change", atualizar);
     atualizar();

@@ -30,7 +30,7 @@ function seletorModelo(s: SituacaoIA): HTMLElement {
     h(
       "option",
       { value: m.id, disabled: !disponivel(m.id) && m.id !== s.modelo },
-      `${m.nome}${m.id === s.modeloPadrao ? " (padrão)" : ""} — ${precoCurto(m)}${disponivel(m.id) ? "" : " · indisponível nesta chave"}`,
+      `${m.id === s.modeloPadrao ? "★ " : ""}${m.nome}${m.id === s.modeloPadrao ? " (recomendado)" : ""} — ${precoCurto(m)}${disponivel(m.id) ? "" : " · indisponível nesta chave"}`,
     );
   const extras = [...new Set([s.modelo, ...modelosDaConta])].filter((id) => !conhecidos.has(id));
   const select = h(
@@ -55,6 +55,7 @@ function seletorModelo(s: SituacaoIA): HTMLElement {
         { class: "modelo-detalhe__topo" },
         h("strong", {}, m.nome),
         h("span", { class: `selo-modelo selo-modelo--${m.grupo}` }, m.grupo === "atual" ? "Atual" : "Geração anterior"),
+        m.id === s.modeloPadrao && h("span", { class: "selo-modelo selo-modelo--atual" }, "★ Recomendado"),
         h("span", { class: "selo-modelo" }, m.velocidade),
       ),
       h("p", {}, m.descricao),
