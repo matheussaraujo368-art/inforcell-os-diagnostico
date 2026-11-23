@@ -35,6 +35,7 @@ import {
   tagStatus,
 } from "../dom.js";
 import { campoFoto } from "../foto.js";
+import { acrescentarTexto, atalhos, etapaForm, iconeAparelho, iconeBusca, ROTULO_TIPO, rotuloObrig } from "../componentes.js";
 import { definirAviso, hashComFiltros, irPara } from "../nav.js";
 import type { ContextoTela } from "../main.js";
 
@@ -376,66 +377,6 @@ export async function telaNovaOrdem(el: HTMLElement, { consulta }: ContextoTela)
   await carregarClientes("", clienteInicial);
   atualizarResumo();
   preencher(el, cabecalhoTela("Nova Ordem de Serviço"), form);
-}
-
-// ---------- Componentes do formulário de Nova OS ----------
-
-const ROTULO_TIPO: Record<string, string> = { CELULAR: "Celular", TABLET: "Tablet", NOTEBOOK: "Notebook", DESKTOP: "Computador", OUTRO: "Outro" };
-/** Ícone simples do tipo de aparelho (celular/tablet ou computador). */
-function iconeAparelho(tipo: string): HTMLElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-hidden", "true");
-  svg.innerHTML =
-    tipo === "CELULAR" || tipo === "TABLET"
-      ? '<rect x="6" y="2.5" width="12" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>'
-      : '<rect x="4" y="4.5" width="16" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M2 19h20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>';
-  return svg as unknown as HTMLElement;
-}
-
-const rotuloObrig = (texto: string): HTMLElement =>
-  h("span", { class: "campo__rotulo" }, texto, h("span", { class: "campo__obrig", "aria-hidden": "true" }, " *"));
-
-function etapaForm(numero: number, titulo: string, descricao: string, acao: HTMLElement | null, ...conteudo: (HTMLElement | false)[]): HTMLElement {
-  return h(
-    "section",
-    { class: "etapa-form" },
-    h(
-      "header",
-      { class: "etapa-form__topo" },
-      h("span", { class: "etapa-form__numero", "aria-hidden": "true" }, numero),
-      h("div", { class: "etapa-form__titulos" }, h("h2", {}, titulo), h("p", {}, descricao)),
-      acao,
-    ),
-    h("div", { class: "etapa-form__corpo" }, ...conteudo),
-  );
-}
-
-/** Botões de atalho que acrescentam um texto ao campo. */
-function atalhos(textos: string[], aoEscolher: (t: string) => void): HTMLElement {
-  return h(
-    "div",
-    { class: "atalhos" },
-    textos.map((t) => h("button", { type: "button", class: "atalho", onClick: () => aoEscolher(t) }, `+ ${t}`)),
-  );
-}
-
-/** Acrescenta o texto ao campo sem repetir e avisa o formulário da mudança. */
-function acrescentarTexto(campoTexto: HTMLInputElement | HTMLTextAreaElement, texto: string, separador: string): void {
-  const atual = campoTexto.value.trim();
-  if (atual.toLowerCase().includes(texto.toLowerCase())) return;
-  campoTexto.value = atual ? `${atual.replace(/[;,.\s]+$/, "")}${separador}${texto}` : texto;
-  campoTexto.dispatchEvent(new Event("input", { bubbles: true }));
-  campoTexto.focus();
-}
-
-function iconeBusca(): HTMLElement {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("class", "busca__icone");
-  svg.innerHTML = '<circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
-  return svg as unknown as HTMLElement;
 }
 
 // ---------- Detalhe ----------

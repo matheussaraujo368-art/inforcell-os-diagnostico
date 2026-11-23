@@ -1,6 +1,7 @@
 /** HU02 — Clientes e seus equipamentos. */
 import { api, Cliente, ClienteDetalhe, Equipamento, Pagina, pode, TipoEquipamento } from "../api.js";
-import { aoEnviar, cabecalhoTela, caixaOk, campo, data, Dados, h, numeroOS, ouNulo, paginador, preencher, tagStatus } from "../dom.js";
+import { aoEnviar, cabecalhoTela, caixaOk, campo, data, Dados, h, numeroOS, ocupado, ouNulo, paginador, preencher, tagStatus } from "../dom.js";
+import { comMascara, etapaForm, formatarCpf, formatarTelefone, iconeAparelho, iconeBusca, iniciais, linkWhatsApp, rotuloObrig } from "../componentes.js";
 import { definirAviso, hashComFiltros, irPara } from "../nav.js";
 import type { ContextoTela } from "../main.js";
 
@@ -29,6 +30,10 @@ function formCliente(atual: Cliente | null, salvar: (d: Dados) => Promise<void>)
     campo({ rotulo: "Endereço", nome: "endereco", valor: atual?.endereco, atributos: { maxlength: 255 } }),
     h("div", { class: "form__acoes" }, h("button", { class: "btn btn--primary btn--sm", type: "submit" }, "Salvar cliente")),
   );
+  const tel = form.querySelector<HTMLInputElement>('input[name="telefone"]');
+  const doc = form.querySelector<HTMLInputElement>('input[name="cpf"]');
+  if (tel) comMascara(tel, formatarTelefone);
+  if (doc) comMascara(doc, formatarCpf);
   aoEnviar(form, salvar);
   return form;
 }
@@ -70,58 +75,238 @@ function formEquipamento(atual: Equipamento | null, salvar: (d: Dados) => Promis
 
 // ---------- Lista ----------
 
+const MARCAS = ["Apple", "Samsung", "Motorola", "Xiaomi", "Realme", "LG", "Asus", "Lenovo", "Dell", "Acer", "HP", "Positivo", "Multilaser"];
+
 export async function telaClientes(el: HTMLElement, { consulta }: ContextoTela): Promise<void> {
   const busca = consulta.get("busca") ?? "";
   const pagina = Number(consulta.get("pagina")) || 1;
-  const q = new URLSearchParams({ pagina: String(pagina) });
-  if (busca) q.set("busca", busca);
-  const r = await api.get<Pagina<Cliente>>(`/clientes?${q}`);
 
-  const filtro = h(
-    "form",
-    { class: "filtros", role: "search" },
-    campo({ rotulo: "Buscar por nome, CPF ou telefone", nome: "busca", tipo: "search", valor: busca }),
-    h("button", { class: "btn btn--outline btn--sm", type: "submit" }, "Buscar"),
+  const listaArea = h("div", { class: "clientes-lista-area" });
+  const contador = h("p", { class: "tela__sub" });
+
+  const carregarLista = async (termo: string, pag: number): Promise<void> => {
+    const q = new URLSearchParams({ pagina: String(pag) });
+    if (termo) q.set("busca", termo);
+    const r = await api.get<Pagina<Cliente>>(`/clientes?${q}`);
+    contador.textContent = termo
+      ? `${r.total} resultado(s) para "${termo}"`
+      : `${r.total} cliente${r.total === 1 ? "" : "s"} cadastrado${r.total === 1 ? "" : "s"}`;
+    listaArea.replaceChildren(
+      r.dados.length === 0
+        ? estadoVazio(termo)
+        : h("ul", { class: "clientes-lista" }, r.dados.map(linhaCliente)),
+      paginador(r.total, r.pagina, r.porPagina, (p) => hashComFiltros("#/clientes", { busca: termo, pagina: p })) ?? "",
+    );
+  };
+
+  // Busca enquanto digita (sem recarregar a tela)
+  const entradaBusca = h("input", {
+    type: "search",
+    name: "busca",
+    value: busca,
+    placeholder: "Buscar por nome, CPF ou telefone…",
+    "aria-label": "Buscar cliente",
+    autocomplete: "off",
+  }) as HTMLInputElement;
+  let atraso = 0;
+  entradaBusca.addEventListener("input", () => {
+    window.clearTimeout(atraso);
+    atraso = window.setTimeout(() => {
+      const termo = entradaBusca.value.trim();
+      history.replaceState(null, "", hashComFiltros("#/clientes", { busca: termo }));
+      void carregarLista(termo, 1);
+    }, 300);
+  });
+  const barraBusca = h("div", { class: "barra-busca", role: "search" }, h("span", { class: "busca" }, iconeBusca(), entradaBusca));
+
+  // Painel de novo cliente (abre pelo botão do topo)
+  const painelNovo = pode.cadastrar() ? formNovoCliente(() => alternarNovo(false)) : null;
+  const botaoNovo = pode.cadastrar() ? (h("button", { class: "btn btn--primary btn--sm", type: "button" }, "+ Novo cliente") as HTMLButtonElement) : null;
+  const alternarNovo = (abrir: boolean): void => {
+    if (!painelNovo || !botaoNovo) return;
+    painelNovo.hidden = !abrir;
+    botaoNovo.hidden = abrir;
+    if (abrir) painelNovo.querySelector<HTMLInputElement>('input[name="nome"]')?.focus();
+  };
+  botaoNovo?.addEventListener("click", () => alternarNovo(true));
+
+  await carregarLista(busca, pagina);
+  preencher(el, cabecalhoTela("Clientes", botaoNovo), contador, painelNovo, barraBusca, listaArea);
+  alternarNovo(consulta.get("novo") === "1" || (!busca && listaArea.querySelector(".estado-vazio") !== null));
+}
+
+function linhaCliente(c: Cliente): HTMLElement {
+  const zap = linkWhatsApp(c.telefone);
+  return h(
+    "li",
+    { class: "cliente-linha" },
+    h("span", { class: "avatar", "aria-hidden": "true" }, iniciais(c.nome)),
+    h(
+      "div",
+      { class: "cliente-linha__principal" },
+      h("a", { class: "cliente-linha__nome", href: `#/clientes/${c.id}` }, c.nome),
+      h("span", { class: "item__sub" }, [c.cpf ? `CPF ${formatarCpf(c.cpf)}` : null, c.email].filter(Boolean).join(" · ") || "Sem CPF e e-mail"),
+    ),
+    h(
+      "div",
+      { class: "cliente-linha__contato" },
+      h("span", { class: "mono" }, formatarTelefone(c.telefone)),
+      zap && h("a", { class: "chip-zap", href: zap, target: "_blank", rel: "noopener", "aria-label": `Abrir WhatsApp de ${c.nome}` }, "WhatsApp"),
+    ),
+    h(
+      "div",
+      { class: "cliente-linha__acoes" },
+      pode.abrirOS() && h("a", { class: "btn btn--outline btn--sm", href: `#/ordens/nova?clienteId=${c.id}` }, "Nova OS"),
+      h("a", { class: "btn btn--sm btn--fantasma", href: `#/clientes/${c.id}`, "aria-label": `Ver ${c.nome}` }, "Ver →"),
+    ),
   );
-  aoEnviar(filtro, async (d) => irPara(hashComFiltros("#/clientes", { busca: d.busca })));
+}
 
-  const novo = formCliente(null, async (d) => {
-    const criado = await api.post<Cliente>("/clientes", dadosCliente(d));
-    definirAviso({ tipo: "ok", texto: `Cliente ${criado.nome} cadastrado. Agora inclua o equipamento.` });
-    irPara(`#/clientes/${criado.id}`);
+function estadoVazio(termo: string): HTMLElement {
+  return h(
+    "div",
+    { class: "estado-vazio" },
+    h("span", { class: "estado-vazio__icone", "aria-hidden": "true" }, iconeBusca()),
+    h("strong", {}, termo ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado ainda"),
+    h("p", {}, termo ? "Confira a grafia ou busque pelo telefone ou CPF." : "Cadastre o primeiro cliente e o aparelho dele para abrir uma OS."),
+  );
+}
+
+/** Formulário em etapas: dados do cliente + aparelho (opcional) + resumo com as ações. */
+function formNovoCliente(fechar: () => void): HTMLElement {
+  const nome = h("input", { name: "nome", required: true, minlength: 2, maxlength: 120, placeholder: "Nome completo", autocomplete: "off" }) as HTMLInputElement;
+  const telefone = comMascara(h("input", { name: "telefone", type: "tel", required: true, inputmode: "numeric", placeholder: "(99) 99999-9999" }) as HTMLInputElement, formatarTelefone);
+  const cpf = comMascara(h("input", { name: "cpf", inputmode: "numeric", placeholder: "000.000.000-00" }) as HTMLInputElement, formatarCpf);
+  const email = h("input", { name: "email", type: "email", placeholder: "cliente@email.com" }) as HTMLInputElement;
+  const endereco = h("input", { name: "endereco", maxlength: 255, placeholder: "Rua, número, bairro" }) as HTMLInputElement;
+
+  const rotulo = (texto: string, obrig = false): HTMLElement => (obrig ? rotuloObrig(texto) : h("span", { class: "campo__rotulo" }, texto));
+  const etapaDados = etapaForm(
+    1,
+    "Dados do cliente",
+    "Nome e telefone são obrigatórios. O telefone é usado no WhatsApp.",
+    null,
+    h("label", { class: "campo" }, rotulo("Nome", true), nome),
+    h("div", { class: "grade-2" }, h("label", { class: "campo" }, rotulo("Telefone (WhatsApp)", true), telefone), h("label", { class: "campo" }, rotulo("CPF"), cpf)),
+    h("div", { class: "grade-2" }, h("label", { class: "campo" }, rotulo("E-mail"), email), h("label", { class: "campo" }, rotulo("Endereço"), endereco)),
+  );
+
+  // ----- Aparelho (opcional) -----
+  const comAparelho = h("input", { type: "checkbox", checked: true }) as HTMLInputElement;
+  const tipo = h(
+    "div",
+    { class: "segmentado", role: "radiogroup", "aria-label": "Tipo de aparelho" },
+    TIPOS.map((t, i) =>
+      h("label", { class: "segmentado__opcao" }, h("input", { type: "radio", name: "tipo", value: t.valor, checked: i === 0 }), h("span", {}, iconeAparelho(t.valor), t.rotulo)),
+    ),
+  );
+  const marca = h("input", { name: "marca", maxlength: 60, list: "lista-marcas", placeholder: "Ex.: Apple, Samsung", autocomplete: "off" }) as HTMLInputElement;
+  const modelo = h("input", { name: "modelo", maxlength: 80, placeholder: "Ex.: iPhone 11, Galaxy A12" }) as HTMLInputElement;
+  const imei = h("input", { name: "imei", inputmode: "numeric", pattern: "\\d{14,16}", title: "De 14 a 16 dígitos, sem espaços", placeholder: "Discar *#06# no aparelho" }) as HTMLInputElement;
+  const cor = h("input", { name: "cor", maxlength: 40, placeholder: "Ex.: Preto" }) as HTMLInputElement;
+  const camposAparelho = h(
+    "div",
+    { class: "etapa-form__corpo-interno" },
+    h("div", { class: "campo" }, rotulo("Tipo"), tipo),
+    h(
+      "div",
+      { class: "grade-2" },
+      h("label", { class: "campo" }, rotulo("Marca", true), marca, h("datalist", { id: "lista-marcas" }, MARCAS.map((m) => h("option", { value: m })))),
+      h("label", { class: "campo" }, rotulo("Modelo", true), modelo),
+    ),
+    h(
+      "div",
+      { class: "grade-2" },
+      h("label", { class: "campo" }, rotulo("IMEI"), imei, h("span", { class: "campo__ajuda" }, "Opcional. 14 a 16 dígitos.")),
+      h("label", { class: "campo" }, rotulo("Cor"), cor),
+    ),
+  );
+  const atualizarAparelho = (): void => {
+    camposAparelho.hidden = !comAparelho.checked;
+    marca.required = modelo.required = comAparelho.checked;
+  };
+  comAparelho.addEventListener("change", atualizarAparelho);
+  const etapaAparelho = etapaForm(
+    2,
+    "Aparelho",
+    "Já cadastre o aparelho que chegou para conserto.",
+    h("label", { class: "interruptor" }, comAparelho, h("span", { class: "interruptor__trilho", "aria-hidden": "true" }), h("span", {}, "Cadastrar agora")),
+    camposAparelho,
+  );
+
+  // ----- Resumo -----
+  const linha = (r: string): { dd: HTMLElement; itens: HTMLElement[] } => {
+    const dd = h("dd", {}, "—");
+    return { dd, itens: [h("dt", {}, r), dd] };
+  };
+  const rNome = linha("Cliente");
+  const rTel = linha("Telefone");
+  const rApar = linha("Aparelho");
+  const avatar = h("span", { class: "avatar avatar--grande", "aria-hidden": "true" }, "?");
+  const areaErro = h("div", {});
+  const botaoSalvar = h("button", { class: "btn btn--outline btn--block", type: "submit", value: "salvar" }, "Salvar cliente") as HTMLButtonElement;
+  const botaoOS = pode.abrirOS() ? (h("button", { class: "btn btn--primary btn--block", type: "submit", value: "os" }, "Salvar e abrir OS") as HTMLButtonElement) : null;
+
+  const atualizarResumo = (): void => {
+    rNome.dd.textContent = nome.value.trim() || "—";
+    avatar.textContent = nome.value.trim() ? iniciais(nome.value) : "?";
+    rTel.dd.textContent = telefone.value || "—";
+    const ap = [marca.value.trim(), modelo.value.trim()].filter(Boolean).join(" ");
+    rApar.dd.textContent = comAparelho.checked ? ap || "—" : "Cadastrar depois";
+  };
+
+  const form = h(
+    "form",
+    { class: "nova-os" },
+    h("div", { class: "nova-os__etapas" }, etapaDados, etapaAparelho),
+    h(
+      "aside",
+      { class: "resumo-os", "aria-label": "Resumo do cadastro" },
+      h("div", { class: "resumo__cabeca" }, avatar, h("h2", {}, "Novo cliente")),
+      h("dl", { class: "resumo__lista" }, rNome.itens, rTel.itens, rApar.itens),
+      botaoOS,
+      botaoSalvar,
+      h("button", { class: "btn btn--sm btn--fantasma btn--block", type: "button", onClick: fechar }, "Cancelar"),
+      areaErro,
+    ),
+  ) as HTMLFormElement;
+  form.addEventListener("input", atualizarResumo);
+  form.addEventListener("change", atualizarResumo);
+
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const acao = (ev as SubmitEvent).submitter?.getAttribute("value") ?? "salvar";
+    const botao = acao === "os" && botaoOS ? botaoOS : botaoSalvar;
+    const d = new FormData(form);
+    const v = (k: string): string => String(d.get(k) ?? "").trim();
+    void ocupado(botao, "Salvando…", areaErro, async () => {
+      const criado = await api.post<Cliente>("/clientes", dadosCliente({ nome: v("nome"), telefone: v("telefone"), cpf: v("cpf"), email: v("email"), endereco: v("endereco") }));
+      let equipamentoId: number | null = null;
+      if (comAparelho.checked) {
+        try {
+          const eq = await api.post<Equipamento>("/equipamentos", {
+            clienteId: criado.id,
+            ...dadosEquipamento({ tipo: v("tipo"), marca: v("marca"), modelo: v("modelo"), imei: v("imei"), numeroSerie: "", cor: v("cor"), observacoes: "" }),
+          });
+          equipamentoId = eq.id;
+        } catch (e) {
+          definirAviso({ tipo: "erro", texto: `Cliente salvo, mas o aparelho não: ${e instanceof Error ? e.message : "erro"}. Cadastre o aparelho abaixo.` });
+          irPara(`#/clientes/${criado.id}`);
+          return;
+        }
+      }
+      if (acao === "os") {
+        irPara(`#/ordens/nova?clienteId=${criado.id}${equipamentoId ? `&equipamentoId=${equipamentoId}` : ""}`);
+      } else {
+        definirAviso({ tipo: "ok", texto: `Cliente ${criado.nome} cadastrado${equipamentoId ? " com o aparelho" : ""}.` });
+        irPara(`#/clientes/${criado.id}`);
+      }
+    });
   });
 
-  preencher(el,
-    cabecalhoTela("Clientes"),
-    pode.cadastrar() && h("details", { class: "painel painel--dobra" }, h("summary", {}, "Novo cliente"), novo),
-    filtro,
-    r.dados.length === 0
-      ? h("p", { class: "vazio" }, busca ? "Nenhum cliente encontrado para esta busca." : "Nenhum cliente cadastrado.")
-      : h(
-          "div",
-          { class: "tabela" },
-          h(
-            "table",
-            {},
-            h("thead", {}, h("tr", {}, h("th", {}, "Nome"), h("th", {}, "Telefone"), h("th", {}, "CPF"), h("th", {}, "E-mail"))),
-            h(
-              "tbody",
-              {},
-              r.dados.map((c) =>
-                h(
-                  "tr",
-                  {},
-                  h("td", {}, h("a", { href: `#/clientes/${c.id}` }, c.nome)),
-                  h("td", {}, c.telefone),
-                  h("td", {}, c.cpf ?? "—"),
-                  h("td", {}, c.email ?? "—"),
-                ),
-              ),
-            ),
-          ),
-        ),
-    paginador(r.total, r.pagina, r.porPagina, (p) => hashComFiltros("#/clientes", { busca, pagina: p })),
-  );
+  atualizarAparelho();
+  atualizarResumo();
+  return h("section", { class: "novo-cliente", hidden: true }, form);
 }
 
 // ---------- Detalhe ----------
