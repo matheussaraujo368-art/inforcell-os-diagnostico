@@ -22,6 +22,8 @@ echo.
 echo [2/5] Criando ou atualizando as tabelas do banco...
 call npx prisma migrate deploy
 if errorlevel 1 goto erro
+call npx prisma generate
+if errorlevel 1 goto erro
 
 echo.
 echo [3/5] Usuarios de teste...
