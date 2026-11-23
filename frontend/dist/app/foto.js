@@ -4,7 +4,7 @@
  */
 import { h } from "./dom.js";
 const LADO_MAXIMO = 1568;
-async function reduzir(arquivo) {
+export async function reduzirImagem(arquivo) {
     if (!arquivo.type.startsWith("image/"))
         throw new Error("Escolha um arquivo de imagem (foto).");
     const bitmap = await createImageBitmap(arquivo).catch(() => {
@@ -42,7 +42,7 @@ export function campoFoto() {
             atual = Promise.resolve(undefined);
             return;
         }
-        atual = reduzir(arquivo).then(({ imagem, url }) => {
+        atual = reduzirImagem(arquivo).then(({ imagem, url }) => {
             previa.replaceChildren(h("img", { src: url, alt: "Prévia da foto anexada" }), h("button", { class: "btn btn--outline btn--sm", type: "button", onClick: limpar }, "Remover foto"));
             return imagem;
         }, (e) => {

@@ -5,6 +5,7 @@ import { caixaErro, caixaOk, h } from "./dom.js";
 import { consumirAviso, definirAviso, irPara, registrarRenderizador } from "./nav.js";
 import { telaCadastro } from "./telas/cadastro.js";
 import { telaConfiguracoes } from "./telas/configuracoes.js";
+import { telaAssistente } from "./telas/assistente.js";
 import { telaCliente, telaClientes } from "./telas/clientes.js";
 import { telaDiagnostico } from "./telas/diagnostico.js";
 import { telaEquipe } from "./telas/equipe.js";
@@ -15,6 +16,8 @@ const ROTAS = [
     [/^\/painel$/, telaPainel],
     [/^\/equipe$/, telaEquipe],
     [/^\/configuracoes$/, telaConfiguracoes],
+    [/^\/assistente$/, telaAssistente],
+    [/^\/assistente\/(\d+)$/, telaAssistente],
     [/^\/ordens$/, telaOrdens],
     [/^\/ordens\/nova$/, telaNovaOrdem],
     [/^\/ordens\/(\d+)$/, telaOrdem],
@@ -30,7 +33,7 @@ function cabecalho(caminho) {
     const u = usuarioAtual();
     const link = (href, texto, prefixo) => h("a", { class: "app-nav__link", href, "aria-current": caminho.startsWith(prefixo) ? "page" : undefined }, texto);
     return h("div", { class: "container app-topo" }, h("a", { class: "logo", href: u ? INICIO : "index.html", "aria-label": "Inforcell OS, início" }, h("span", { class: "logo__icon", "aria-hidden": "true" }), h("span", { class: "logo__text" }, "INFORCELL", h("span", { class: "accent" }, " OS"))), u &&
-        h("nav", { class: "app-nav", "aria-label": "Navegação principal" }, link("#/painel", "Painel", "/painel"), link("#/ordens", "Ordens de Serviço", "/ordens"), link("#/clientes", "Clientes", "/clientes"), pode.gerirEquipe() && link("#/equipe", "Equipe", "/equipe"), pode.configurar() && link("#/configuracoes", "Configurações", "/configuracoes")), u &&
+        h("nav", { class: "app-nav", "aria-label": "Navegação principal" }, link("#/painel", "Painel", "/painel"), link("#/ordens", "Ordens de Serviço", "/ordens"), link("#/assistente", "Assistente IA", "/assistente"), link("#/clientes", "Clientes", "/clientes"), pode.gerirEquipe() && link("#/equipe", "Equipe", "/equipe"), pode.configurar() && link("#/configuracoes", "Configurações", "/configuracoes")), u &&
         h("div", { class: "app-usuario" }, h("span", { class: `avatar avatar--mini avatar--${u.perfil.toLowerCase()}`, "aria-hidden": "true" }, iniciais(u.nome)), h("span", { class: "app-usuario__texto" }, h("strong", { class: "app-usuario__nome" }, u.nome), h("span", { class: "app-usuario__detalhe" }, 
         // Não repete o perfil quando o nome da conta já é o próprio perfil (ex.: "Administrador").
         [u.nome.trim().toLowerCase() === ROTULO_PERFIL[u.perfil].toLowerCase() ? null : ROTULO_PERFIL[u.perfil], empresaAtual()?.nome]

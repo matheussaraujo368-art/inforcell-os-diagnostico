@@ -68,11 +68,12 @@ model Empresa {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  usuarios     Usuario[]
-  clientes     Cliente[]
-  equipamentos Equipamento[]
-  ordens       OrdemServico[]
-  artigos      ArtigoConhecimento[]
+  usuarios         Usuario[]
+  clientes         Cliente[]
+  equipamentos     Equipamento[]
+  ordens           OrdemServico[]
+  artigos          ArtigoConhecimento[]
+  conversasBancada ConversaBancada[]
 
   @@map("empresas")
 }
@@ -90,12 +91,13 @@ model Usuario {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  empresa      Empresa             @relation(fields: [empresaId], references: [id])
-  osAbertas    OrdemServico[]      @relation("AtendenteOS")
-  osAtribuidas OrdemServico[]      @relation("TecnicoOS")
-  historicos   HistoricoStatus[]
-  sessoes      SessaoDiagnostico[]
-  reparos      Reparo[]
+  empresa          Empresa             @relation(fields: [empresaId], references: [id])
+  osAbertas        OrdemServico[]      @relation("AtendenteOS")
+  osAtribuidas     OrdemServico[]      @relation("TecnicoOS")
+  historicos       HistoricoStatus[]
+  sessoes          SessaoDiagnostico[]
+  reparos          Reparo[]
+  conversasBancada ConversaBancada[]
 
   @@map("usuarios")
 }
@@ -288,4 +290,37 @@ model ArtigoConhecimento {
   empresa Empresa @relation(fields: [empresaId], references: [id])
 
   @@map("base_conhecimento")
+}
+
+/// Assistente de bancada: conversa livre do técnico com a IA (fora de uma OS).
+model ConversaBancada {
+  id        Int      @id @default(autoincrement())
+  empresaId Int
+  usuarioId Int
+  titulo    String   @db.VarChar(120)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empresa   Empresa           @relation(fields: [empresaId], references: [id])
+  usuario   Usuario           @relation(fields: [usuarioId], references: [id])
+  mensagens MensagemBancada[]
+
+  @@index([usuarioId, updatedAt])
+  @@map("conversas_bancada")
+}
+
+model MensagemBancada {
+  id         Int           @id @default(autoincrement())
+  conversaId Int
+  autor      AutorMensagem
+  conteudo   String        @db.Text
+  /// Resumo dos anexos enviados (tipo e quantidade). As imagens em si não são guardadas.
+  anexos     Json?
+  /// Consultas que o agente fez antes de responder.
+  passos     Json?
+  createdAt  DateTime      @default(now())
+
+  conversa ConversaBancada @relation(fields: [conversaId], references: [id], onDelete: Cascade)
+
+  @@map("mensagens_bancada")
 }

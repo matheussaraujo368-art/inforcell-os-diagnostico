@@ -111,18 +111,21 @@ export function sanitizarTexto(texto: string): string {
 
 // ---------- Prompt ----------
 
-export function montarSystemPrompt(nomeEmpresa = "Inforcell"): string {
-  return `Você é o agente de diagnóstico da ${nomeEmpresa.trim() || "Inforcell"}, uma assistência técnica de eletrônicos com foco principal em CELULARES (iPhone e Android). Também atende tablets, notebooks e computadores.
-Seu papel é conduzir um técnico de eletrônica por um diagnóstico estruturado, um teste de cada vez, até a causa provável do defeito e a resolução.
-
-Conhecimento esperado em celulares (use quando o aparelho for celular ou tablet):
+/** Conhecimento de bancada usado pelo diagnóstico e pelo assistente de bancada. */
+export const CONHECIMENTO_CELULAR = `Conhecimento esperado em celulares (use quando o aparelho for celular ou tablet):
 - Roteiro de bancada: inspeção visual e de oxidação, teste com bateria conhecida, consumo na fonte de bancada no conector da bateria (≈3,8–4,2 V), comportamento do consumo (curto imediato, zero ao pressionar Power, sobe e cai em ciclo/boot loop, trava num valor fixo).
 - Linhas e blocos principais: VBAT/VDD_MAIN (PP_VDD_MAIN no iPhone; VPH_PWR/VSYS no Android), PMIC, circuito de carga (Tristar/Hydra e IC de carga no iPhone; PMI/IC de carga no Android), linhas de backlight e display, áudio, baseband/RF.
 - Medição em modo diodo (queda de tensão) e resistência para comparar com placa boa; injeção de tensão baixa e câmera térmica ou álcool isopropílico para achar curto.
 - Defeitos comuns: flex de Power/volume, conector de carga sujo ou oxidado, bateria, tela/touch, câmera, Face ID/True Tone e peças pareadas (serialização) no iPhone, reboot por sensor ou flex, sem sinal, sem áudio, aquecimento.
 - Resolução: limpeza de oxidação (ultrassom e álcool isopropílico), troca de flex/conector/bateria/tela, reflow ou reballing com cuidado com underfill, jumper em trilha rompida. Indique quando o reparo é de alto risco ou inviável economicamente.
 - Peças paralelas versus originais e avisos ao cliente quando a peça pode gerar mensagem de "peça desconhecida".
+`;
 
+export function montarSystemPrompt(nomeEmpresa = "Inforcell"): string {
+  return `Você é o agente de diagnóstico da ${nomeEmpresa.trim() || "Inforcell"}, uma assistência técnica de eletrônicos com foco principal em CELULARES (iPhone e Android). Também atende tablets, notebooks e computadores.
+Seu papel é conduzir um técnico de eletrônica por um diagnóstico estruturado, um teste de cada vez, até a causa provável do defeito e a resolução.
+
+${CONHECIMENTO_CELULAR}
 Regras:
 - Responda sempre em português do Brasil, de forma objetiva e técnica.
 - Na primeira resposta, liste de 3 a 5 causas possíveis ordenadas da mais para a menos provável e proponha o PRIMEIRO teste.
@@ -352,8 +355,11 @@ export interface ChamadaModelo {
   system: string;
   messages: Anthropic.MessageParam[];
   tools: Anthropic.Tool[];
-  /** "qualquer" = precisa usar alguma ferramenta; "final" = precisa responder com registrar_orientacao. */
-  escolha: "qualquer" | "final";
+  /**
+   * "qualquer" = precisa usar alguma ferramenta; "final" = precisa responder com registrar_orientacao;
+   * "auto" = decide entre ferramenta e texto (assistente de bancada); "nenhuma" = só texto.
+   */
+  escolha: "qualquer" | "final" | "auto" | "nenhuma";
 }
 
 /** Uma chamada ao modelo. Pode ser substituída nos testes por um modelo simulado. */
@@ -369,7 +375,14 @@ const modeloAnthropic: ModeloIA = async (chamada, config) => {
       max_tokens: 4096,
       system: chamada.system,
       tools: chamada.tools,
-      tool_choice: chamada.escolha === "final" ? { type: "tool", name: FERRAMENTA.name } : { type: "any" },
+      tool_choice:
+        chamada.escolha === "final"
+          ? { type: "tool", name: FERRAMENTA.name }
+          : chamada.escolha === "qualquer"
+            ? { type: "any" }
+            : chamada.escolha === "auto"
+              ? { type: "auto" }
+              : { type: "none" },
       messages: chamada.messages,
     });
     const content: BlocoModelo[] = [];
@@ -420,6 +433,14 @@ export function definirClienteIA(c: ClienteIA | null) {
   modeloAtual = async (chamada, config) => ({
     content: [{ type: "tool_use", id: "simulado", name: FERRAMENTA.name, input: await c(chamada.system, chamada.messages, config) }],
   });
+}
+
+/** Modelo em uso (real ou simulado) e a configuração de chave, para outros serviços de IA. */
+export async function prepararModelo(empresaId: number): Promise<{ modelo: ModeloIA; config: ConfigIA }> {
+  if (modeloAtual !== modeloAnthropic) return { modelo: modeloAtual, config: { apiKey: "", modelo: env.ANTHROPIC_MODEL, origem: "servidor" } };
+  const config = await configIADaEmpresa(empresaId);
+  if (!config) throw new AppError(503, MENSAGEM_IA_NAO_CONFIGURADA);
+  return { modelo: modeloAtual, config };
 }
 
 /** True quando a IA pode ser usada pela empresa (ou quando um modelo simulado está ativo). */

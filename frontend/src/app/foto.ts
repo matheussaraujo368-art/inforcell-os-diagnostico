@@ -11,7 +11,7 @@ export interface ImagemEnvio {
 
 const LADO_MAXIMO = 1568;
 
-async function reduzir(arquivo: File): Promise<{ imagem: ImagemEnvio; url: string }> {
+export async function reduzirImagem(arquivo: File): Promise<{ imagem: ImagemEnvio; url: string }> {
   if (!arquivo.type.startsWith("image/")) throw new Error("Escolha um arquivo de imagem (foto).");
   const bitmap = await createImageBitmap(arquivo).catch(() => {
     throw new Error("Não foi possível abrir esta imagem. Tente uma foto em JPG ou PNG.");
@@ -50,7 +50,7 @@ export function campoFoto(): { elemento: HTMLElement; obter: () => Promise<Image
       atual = Promise.resolve(undefined);
       return;
     }
-    atual = reduzir(arquivo).then(
+    atual = reduzirImagem(arquivo).then(
       ({ imagem, url }) => {
         previa.replaceChildren(
           h("img", { src: url, alt: "Prévia da foto anexada" }),

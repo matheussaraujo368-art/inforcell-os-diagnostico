@@ -372,6 +372,27 @@ export async function iaDisponivel(): Promise<boolean> {
   }
 }
 
+// ---------- Assistente de bancada ----------
+
+export interface ConversaResumo {
+  id: number;
+  titulo: string;
+  updatedAt: string;
+}
+
+export interface MensagemBancada {
+  id: number;
+  autor: "TECNICO" | "IA";
+  conteudo: string;
+  anexos: { tipo: "foto" | "video"; quantidade: number } | null;
+  passos: { ferramenta: string; resumo: string }[] | null;
+  createdAt: string;
+}
+
+export interface ConversaCompleta extends ConversaResumo {
+  mensagens: MensagemBancada[];
+}
+
 // ---------- Permissões (espelham os perfis da API) ----------
 
 const perfilEh = (...perfis: Perfil[]): boolean => {

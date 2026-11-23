@@ -15,6 +15,7 @@ import { diagnosticosRoutes } from "./modules/diagnosticos.routes";
 import { conhecimentoRoutes } from "./modules/conhecimento.routes";
 import { dashboardRoutes } from "./modules/dashboard.routes";
 import { configuracoesRoutes } from "./modules/configuracoes.routes";
+import { bancadaRoutes } from "./modules/bancada.routes";
 
 /**
  * Publica as telas junto com a API, em um único endereço. Serve só o necessário para o site,
@@ -40,10 +41,13 @@ export function criarApp() {
       origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(",").map((s) => s.trim()),
     }),
   );
-  // Fotos para o diagnóstico chegam em base64: só essas rotas aceitam corpo maior.
+  // Fotos (e quadros de vídeo) chegam em base64: só o diagnóstico e o assistente aceitam corpo maior.
   const jsonPadrao = express.json({ limit: "1mb" });
   const jsonComFoto = express.json({ limit: "8mb" });
-  app.use((req, res, next) => (/\/diagnosticos(\/|$)/.test(req.path) ? jsonComFoto : jsonPadrao)(req, res, next));
+  const jsonBancada = express.json({ limit: "16mb" });
+  app.use((req, res, next) =>
+    (/\/bancada(\/|$)/.test(req.path) ? jsonBancada : /\/diagnosticos(\/|$)/.test(req.path) ? jsonComFoto : jsonPadrao)(req, res, next),
+  );
 
   app.get("/api/health", (_req, res) => {
     // "ia" indica só a chave do servidor; cada empresa pode ter a própria (GET /api/configuracoes/ia/status).
@@ -63,6 +67,7 @@ export function criarApp() {
   api.use("/conhecimento", conhecimentoRoutes);
   api.use("/dashboard", dashboardRoutes);
   api.use("/configuracoes", configuracoesRoutes);
+  api.use("/bancada", bancadaRoutes);
   api.use("/", diagnosticosRoutes); // /ordens/:osId/diagnosticos e /diagnosticos/:id
   app.use("/api", api);
 

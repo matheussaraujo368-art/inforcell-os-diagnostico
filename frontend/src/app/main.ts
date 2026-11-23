@@ -5,6 +5,7 @@ import { caixaErro, caixaOk, h } from "./dom.js";
 import { consumirAviso, definirAviso, irPara, registrarRenderizador } from "./nav.js";
 import { telaCadastro } from "./telas/cadastro.js";
 import { telaConfiguracoes } from "./telas/configuracoes.js";
+import { telaAssistente } from "./telas/assistente.js";
 import { telaCliente, telaClientes } from "./telas/clientes.js";
 import { telaDiagnostico } from "./telas/diagnostico.js";
 import { telaEquipe } from "./telas/equipe.js";
@@ -23,6 +24,8 @@ const ROTAS: [RegExp, Tela][] = [
   [/^\/painel$/, telaPainel],
   [/^\/equipe$/, telaEquipe],
   [/^\/configuracoes$/, telaConfiguracoes],
+  [/^\/assistente$/, telaAssistente],
+  [/^\/assistente\/(\d+)$/, telaAssistente],
   [/^\/ordens$/, telaOrdens],
   [/^\/ordens\/nova$/, telaNovaOrdem],
   [/^\/ordens\/(\d+)$/, telaOrdem],
@@ -56,6 +59,7 @@ function cabecalho(caminho: string): HTMLElement {
         { class: "app-nav", "aria-label": "Navegação principal" },
         link("#/painel", "Painel", "/painel"),
         link("#/ordens", "Ordens de Serviço", "/ordens"),
+        link("#/assistente", "Assistente IA", "/assistente"),
         link("#/clientes", "Clientes", "/clientes"),
         pode.gerirEquipe() && link("#/equipe", "Equipe", "/equipe"),
         pode.configurar() && link("#/configuracoes", "Configurações", "/configuracoes"),
