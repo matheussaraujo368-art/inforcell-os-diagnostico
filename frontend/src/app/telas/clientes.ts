@@ -1,7 +1,7 @@
 /** HU02 — Clientes e seus equipamentos. */
 import { api, Cliente, ClienteDetalhe, Equipamento, Pagina, pode, TipoEquipamento } from "../api.js";
 import { aoEnviar, cabecalhoTela, caixaOk, campo, data, Dados, h, numeroOS, ocupado, ouNulo, paginador, preencher, tagStatus } from "../dom.js";
-import { comMascara, etapaForm, formatarCpf, formatarTelefone, iconeAparelho, iconeBusca, iniciais, linkWhatsApp, rotuloObrig } from "../componentes.js";
+import { comMascara, etapaForm, painelRecolhivel, Recolhivel, formatarCpf, formatarTelefone, iconeAparelho, iconeBusca, iniciais, linkWhatsApp, rotuloObrig } from "../componentes.js";
 import { definirAviso, hashComFiltros, irPara } from "../nav.js";
 import type { ContextoTela } from "../main.js";
 
@@ -119,20 +119,13 @@ export async function telaClientes(el: HTMLElement, { consulta }: ContextoTela):
   });
   const barraBusca = h("div", { class: "barra-busca", role: "search" }, h("span", { class: "busca" }, iconeBusca(), entradaBusca));
 
-  // Painel de novo cliente (abre pelo botão do topo)
-  const painelNovo = pode.cadastrar() ? formNovoCliente(() => alternarNovo(false)) : null;
-  const botaoNovo = pode.cadastrar() ? (h("button", { class: "btn btn--primary btn--sm", type: "button" }, "+ Novo cliente") as HTMLButtonElement) : null;
-  const alternarNovo = (abrir: boolean): void => {
-    if (!painelNovo || !botaoNovo) return;
-    painelNovo.hidden = !abrir;
-    botaoNovo.hidden = abrir;
-    if (abrir) painelNovo.querySelector<HTMLInputElement>('input[name="nome"]')?.focus();
-  };
-  botaoNovo?.addEventListener("click", () => alternarNovo(true));
+  // Painel de novo cliente: abre e recolhe pelo botão do topo
+  let recolhivel: Recolhivel | null = null;
+  if (pode.cadastrar()) recolhivel = painelRecolhivel("Novo cliente", formNovoCliente(() => recolhivel?.fechar()));
 
   await carregarLista(busca, pagina);
-  preencher(el, cabecalhoTela("Clientes", botaoNovo), contador, painelNovo, barraBusca, listaArea);
-  alternarNovo(consulta.get("novo") === "1" || (!busca && listaArea.querySelector(".estado-vazio") !== null));
+  preencher(el, cabecalhoTela("Clientes", recolhivel?.botao), contador, recolhivel?.painel, barraBusca, listaArea);
+  if (consulta.get("novo") === "1" || (!busca && listaArea.querySelector(".estado-vazio") !== null)) recolhivel?.abrir();
 }
 
 function linhaCliente(c: Cliente): HTMLElement {
@@ -306,7 +299,7 @@ function formNovoCliente(fechar: () => void): HTMLElement {
 
   atualizarAparelho();
   atualizarResumo();
-  return h("section", { class: "novo-cliente", hidden: true }, form);
+  return h("section", { class: "novo-cliente" }, form);
 }
 
 // ---------- Detalhe ----------

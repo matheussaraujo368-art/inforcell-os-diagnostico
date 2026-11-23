@@ -631,3 +631,43 @@ a.lista-status__link:hover { background: var(--surface-2); }
   .senha-linha { grid-template-columns: 1fr 1fr; }
   .senha-linha input { grid-column: 1 / -1; }
 }
+
+/* ---------- Painel recolhível + botão que alterna ---------- */
+.recolhivel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: grid-template-rows 0.35s var(--ease), opacity 0.25s var(--ease), transform 0.35s var(--ease), margin 0.35s var(--ease);
+  margin-bottom: 0;
+}
+.recolhivel[data-aberto="true"] { grid-template-rows: 1fr; opacity: 1; transform: none; margin-bottom: 24px; }
+.recolhivel__interno { min-height: 0; overflow: hidden; }
+.recolhivel[data-aberto="true"] .recolhivel__interno { overflow: visible; }
+.recolhivel .novo-cliente { margin-bottom: 0; }
+
+.btn-alternar {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding-left: 12px;
+  background: var(--accent); color: #04211b; border: 1px solid var(--accent);
+  transition: background 0.25s var(--ease), color 0.25s var(--ease), border-color 0.25s var(--ease), box-shadow 0.25s var(--ease);
+}
+.btn-alternar:hover { background: var(--accent-strong); box-shadow: 0 8px 30px -10px rgba(25, 230, 193, 0.6); }
+.btn-alternar__icone {
+  position: relative; flex: none; width: 18px; height: 18px; border-radius: 50%;
+  background: rgba(4, 33, 27, 0.14);
+  transition: transform 0.35s var(--ease), background 0.25s var(--ease);
+}
+.btn-alternar__icone::before, .btn-alternar__icone::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 10px; height: 2px; border-radius: 2px;
+  background: currentColor; transform: translate(-50%, -50%);
+}
+.btn-alternar__icone::after { transform: translate(-50%, -50%) rotate(90deg); }
+/* Aberto: vira um "×" e o botão fica discreto */
+.btn-alternar--aberto { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); }
+.btn-alternar--aberto:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); box-shadow: none; }
+.btn-alternar--aberto .btn-alternar__icone { transform: rotate(135deg); background: var(--accent-soft); }
+
+@media (prefers-reduced-motion: reduce) {
+  .recolhivel, .btn-alternar, .btn-alternar__icone { transition: none; }
+}

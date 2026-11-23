@@ -1,7 +1,7 @@
 /** RF01/RF02 — Usuários da empresa, geridos pelo administrador. */
 import { api, MembroEquipe, Perfil, pode, usuarioAtual } from "../api.js";
 import { cabecalhoTela, caixaAviso, caixaOk, h, ocupado, preencher } from "../dom.js";
-import { etapaForm, iniciais, rotuloObrig } from "../componentes.js";
+import { etapaForm, iniciais, painelRecolhivel, rotuloObrig } from "../componentes.js";
 
 const ROTULO_PERFIL: Record<Perfil, string> = { ADMIN: "Administrador", ATENDENTE: "Atendente", TECNICO: "Técnico" };
 
@@ -66,18 +66,12 @@ export async function telaEquipe(el: HTMLElement): Promise<void> {
     const ativos = membros.filter((m) => m.ativo);
     const conta = (p: Perfil): number => ativos.filter((m) => m.perfil === p).length;
 
-    // ---------- Formulário em etapas ----------
-    const painelNovo = formNovoMembro(async (nome, email, senha) => {
+    // ---------- Formulário em etapas (abre e recolhe pelo botão do topo) ----------
+    const formulario = formNovoMembro(async (nome, email, senha) => {
       await carregar(`${nome} foi adicionado(a) à equipe.`, cartaoAcesso(nome, email, senha, "Acesso criado"));
     });
-    const botaoNovo = h("button", { class: "btn btn--primary btn--sm", type: "button" }, "+ Adicionar pessoa") as HTMLButtonElement;
-    const alternar = (abrir: boolean): void => {
-      painelNovo.hidden = !abrir;
-      botaoNovo.hidden = abrir;
-      if (abrir) painelNovo.querySelector<HTMLInputElement>('input[name="nome"]')?.focus();
-    };
-    botaoNovo.addEventListener("click", () => alternar(true));
-    painelNovo.addEventListener("fechar", () => alternar(false));
+    const recolhivel = painelRecolhivel("Adicionar pessoa", formulario);
+    formulario.addEventListener("fechar", () => recolhivel.fechar());
 
     // ---------- Cartão de cada pessoa ----------
     const cartaoMembro = (m: MembroEquipe): HTMLElement => {
@@ -142,12 +136,12 @@ export async function telaEquipe(el: HTMLElement): Promise<void> {
 
     preencher(
       el,
-      cabecalhoTela("Equipe", botaoNovo),
+      cabecalhoTela("Equipe", recolhivel.botao),
       h("p", { class: "tela__sub" }, `${ativos.length} pessoa${ativos.length === 1 ? "" : "s"} ativa${ativos.length === 1 ? "" : "s"}${membros.length > ativos.length ? ` · ${membros.length - ativos.length} inativa(s)` : ""}`),
       aviso && caixaOk(aviso),
       acesso,
       areaErro,
-      painelNovo,
+      recolhivel.painel,
       h(
         "div",
         { class: "perfis-resumo" },
@@ -164,7 +158,7 @@ export async function telaEquipe(el: HTMLElement): Promise<void> {
         caixaAviso("Ainda não há técnico ativo. Adicione um para atribuir OS e usar o diagnóstico com o agente de IA."),
       h("ul", { class: "membros" }, ordenados.map(cartaoMembro)),
     );
-    alternar(membros.length === 1 && !aviso);
+    if (membros.length === 1 && !aviso) recolhivel.abrir();
   };
 
   await carregar();
@@ -214,7 +208,7 @@ function formNovoMembro(aoCriar: (nome: string, email: string, senha: string) =>
   const areaErro = h("div", {});
   const botao = h("button", { class: "btn btn--primary btn--block", type: "submit" }, "Adicionar à equipe") as HTMLButtonElement;
 
-  const secao = h("section", { class: "novo-cliente", hidden: true });
+  const secao = h("section", { class: "novo-cliente" });
   const form = h(
     "form",
     { class: "nova-os" },

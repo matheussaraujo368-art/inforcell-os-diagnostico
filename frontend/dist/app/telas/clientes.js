@@ -1,7 +1,7 @@
 /** HU02 — Clientes e seus equipamentos. */
 import { api, pode } from "../api.js";
 import { aoEnviar, cabecalhoTela, caixaOk, campo, data, h, numeroOS, ocupado, ouNulo, paginador, preencher, tagStatus } from "../dom.js";
-import { comMascara, etapaForm, formatarCpf, formatarTelefone, iconeAparelho, iconeBusca, iniciais, linkWhatsApp, rotuloObrig } from "../componentes.js";
+import { comMascara, etapaForm, painelRecolhivel, formatarCpf, formatarTelefone, iconeAparelho, iconeBusca, iniciais, linkWhatsApp, rotuloObrig } from "../componentes.js";
 import { definirAviso, hashComFiltros, irPara } from "../nav.js";
 const TIPOS = [
     { valor: "CELULAR", rotulo: "Celular" },
@@ -85,21 +85,14 @@ export async function telaClientes(el, { consulta }) {
         }, 300);
     });
     const barraBusca = h("div", { class: "barra-busca", role: "search" }, h("span", { class: "busca" }, iconeBusca(), entradaBusca));
-    // Painel de novo cliente (abre pelo botão do topo)
-    const painelNovo = pode.cadastrar() ? formNovoCliente(() => alternarNovo(false)) : null;
-    const botaoNovo = pode.cadastrar() ? h("button", { class: "btn btn--primary btn--sm", type: "button" }, "+ Novo cliente") : null;
-    const alternarNovo = (abrir) => {
-        if (!painelNovo || !botaoNovo)
-            return;
-        painelNovo.hidden = !abrir;
-        botaoNovo.hidden = abrir;
-        if (abrir)
-            painelNovo.querySelector('input[name="nome"]')?.focus();
-    };
-    botaoNovo?.addEventListener("click", () => alternarNovo(true));
+    // Painel de novo cliente: abre e recolhe pelo botão do topo
+    let recolhivel = null;
+    if (pode.cadastrar())
+        recolhivel = painelRecolhivel("Novo cliente", formNovoCliente(() => recolhivel?.fechar()));
     await carregarLista(busca, pagina);
-    preencher(el, cabecalhoTela("Clientes", botaoNovo), contador, painelNovo, barraBusca, listaArea);
-    alternarNovo(consulta.get("novo") === "1" || (!busca && listaArea.querySelector(".estado-vazio") !== null));
+    preencher(el, cabecalhoTela("Clientes", recolhivel?.botao), contador, recolhivel?.painel, barraBusca, listaArea);
+    if (consulta.get("novo") === "1" || (!busca && listaArea.querySelector(".estado-vazio") !== null))
+        recolhivel?.abrir();
 }
 function linhaCliente(c) {
     const zap = linkWhatsApp(c.telefone);
@@ -187,7 +180,7 @@ function formNovoCliente(fechar) {
     });
     atualizarAparelho();
     atualizarResumo();
-    return h("section", { class: "novo-cliente", hidden: true }, form);
+    return h("section", { class: "novo-cliente" }, form);
 }
 // ---------- Detalhe ----------
 export async function telaCliente(el, { params }) {

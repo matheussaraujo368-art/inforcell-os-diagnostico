@@ -1,7 +1,7 @@
 /** RF01/RF02 — Usuários da empresa, geridos pelo administrador. */
 import { api, pode, usuarioAtual } from "../api.js";
 import { cabecalhoTela, caixaAviso, caixaOk, h, ocupado, preencher } from "../dom.js";
-import { etapaForm, iniciais, rotuloObrig } from "../componentes.js";
+import { etapaForm, iniciais, painelRecolhivel, rotuloObrig } from "../componentes.js";
 const ROTULO_PERFIL = { ADMIN: "Administrador", ATENDENTE: "Atendente", TECNICO: "Técnico" };
 /** O que cada perfil pode fazer (mostrado ao escolher). */
 const PERFIS = [
@@ -43,19 +43,12 @@ export async function telaEquipe(el) {
         const areaErro = h("div", {});
         const ativos = membros.filter((m) => m.ativo);
         const conta = (p) => ativos.filter((m) => m.perfil === p).length;
-        // ---------- Formulário em etapas ----------
-        const painelNovo = formNovoMembro(async (nome, email, senha) => {
+        // ---------- Formulário em etapas (abre e recolhe pelo botão do topo) ----------
+        const formulario = formNovoMembro(async (nome, email, senha) => {
             await carregar(`${nome} foi adicionado(a) à equipe.`, cartaoAcesso(nome, email, senha, "Acesso criado"));
         });
-        const botaoNovo = h("button", { class: "btn btn--primary btn--sm", type: "button" }, "+ Adicionar pessoa");
-        const alternar = (abrir) => {
-            painelNovo.hidden = !abrir;
-            botaoNovo.hidden = abrir;
-            if (abrir)
-                painelNovo.querySelector('input[name="nome"]')?.focus();
-        };
-        botaoNovo.addEventListener("click", () => alternar(true));
-        painelNovo.addEventListener("fechar", () => alternar(false));
+        const recolhivel = painelRecolhivel("Adicionar pessoa", formulario);
+        formulario.addEventListener("fechar", () => recolhivel.fechar());
         // ---------- Cartão de cada pessoa ----------
         const cartaoMembro = (m) => {
             const souEu = m.id === usuarioAtual()?.id;
@@ -95,9 +88,10 @@ export async function telaEquipe(el) {
         };
         const ordem = { ADMIN: 0, ATENDENTE: 1, TECNICO: 2 };
         const ordenados = [...membros].sort((a, b) => Number(b.ativo) - Number(a.ativo) || ordem[a.perfil] - ordem[b.perfil] || a.nome.localeCompare(b.nome));
-        preencher(el, cabecalhoTela("Equipe", botaoNovo), h("p", { class: "tela__sub" }, `${ativos.length} pessoa${ativos.length === 1 ? "" : "s"} ativa${ativos.length === 1 ? "" : "s"}${membros.length > ativos.length ? ` · ${membros.length - ativos.length} inativa(s)` : ""}`), aviso && caixaOk(aviso), acesso, areaErro, painelNovo, h("div", { class: "perfis-resumo" }, PERFIS.map((p) => h("div", { class: `perfil-resumo perfil-resumo--${p.valor.toLowerCase()}` }, h("span", { class: "perfil-resumo__valor" }, conta(p.valor)), h("span", { class: "perfil-resumo__rotulo" }, `${p.titulo}${conta(p.valor) === 1 ? "" : p.valor === "ADMIN" ? "es" : "s"}`)))), conta("TECNICO") === 0 &&
+        preencher(el, cabecalhoTela("Equipe", recolhivel.botao), h("p", { class: "tela__sub" }, `${ativos.length} pessoa${ativos.length === 1 ? "" : "s"} ativa${ativos.length === 1 ? "" : "s"}${membros.length > ativos.length ? ` · ${membros.length - ativos.length} inativa(s)` : ""}`), aviso && caixaOk(aviso), acesso, areaErro, recolhivel.painel, h("div", { class: "perfis-resumo" }, PERFIS.map((p) => h("div", { class: `perfil-resumo perfil-resumo--${p.valor.toLowerCase()}` }, h("span", { class: "perfil-resumo__valor" }, conta(p.valor)), h("span", { class: "perfil-resumo__rotulo" }, `${p.titulo}${conta(p.valor) === 1 ? "" : p.valor === "ADMIN" ? "es" : "s"}`)))), conta("TECNICO") === 0 &&
             caixaAviso("Ainda não há técnico ativo. Adicione um para atribuir OS e usar o diagnóstico com o agente de IA."), h("ul", { class: "membros" }, ordenados.map(cartaoMembro)));
-        alternar(membros.length === 1 && !aviso);
+        if (membros.length === 1 && !aviso)
+            recolhivel.abrir();
     };
     await carregar();
 }
@@ -130,7 +124,7 @@ function formNovoMembro(aoCriar) {
     const rPerfil = h("dd", {}, "Técnico");
     const areaErro = h("div", {});
     const botao = h("button", { class: "btn btn--primary btn--block", type: "submit" }, "Adicionar à equipe");
-    const secao = h("section", { class: "novo-cliente", hidden: true });
+    const secao = h("section", { class: "novo-cliente" });
     const form = h("form", { class: "nova-os" }, h("div", { class: "nova-os__etapas" }, etapaForm(1, "Quem é", "O e-mail será o login da pessoa.", null, h("div", { class: "grade-2" }, h("label", { class: "campo" }, rotuloObrig("Nome"), nome), h("label", { class: "campo" }, rotuloObrig("E-mail"), email))), etapaForm(2, "Perfil", "Define o que a pessoa pode fazer no sistema. Dá para mudar depois.", null, opcoesPerfil), etapaForm(3, "Senha inicial", "Gere uma senha e envie para a pessoa. Ela pode trocar depois.", null, h("div", { class: "campo" }, rotuloObrig("Senha"), h("div", { class: "senha-linha" }, senha, mostrar, gerar), medidor, textoForca))), h("aside", { class: "resumo-os", "aria-label": "Resumo" }, h("div", { class: "resumo__cabeca" }, avatar, h("h2", {}, "Nova pessoa")), h("dl", { class: "resumo__lista" }, h("dt", {}, "Nome"), rNome, h("dt", {}, "E-mail"), rEmail, h("dt", {}, "Perfil"), rPerfil), botao, h("button", { class: "btn btn--sm btn--fantasma btn--block", type: "button", onClick: () => secao.dispatchEvent(new Event("fechar")) }, "Cancelar"), areaErro));
     const atualizar = () => {
         rNome.textContent = nome.value.trim() || "—";

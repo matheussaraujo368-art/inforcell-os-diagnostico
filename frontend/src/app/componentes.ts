@@ -108,3 +108,57 @@ export const iniciais = (nome: string): string =>
     .slice(0, 2)
     .map((p) => p[0].toUpperCase())
     .join("") || "?";
+
+// ---------- Painel recolhível com botão que alterna ----------
+
+let contadorRecolhivel = 0;
+
+export interface Recolhivel {
+  painel: HTMLElement;
+  botao: HTMLButtonElement;
+  abrir: () => void;
+  fechar: () => void;
+  aberto: () => boolean;
+}
+
+/**
+ * Painel que abre e fecha deslizando, controlado por um botão que se transforma:
+ * "+ Novo …" (fechado) ↔ "× Recolher" (aberto). O conteúdo fechado fica fora da
+ * navegação por teclado (inert).
+ */
+export function painelRecolhivel(rotuloAbrir: string, conteudo: HTMLElement, aoAbrir?: () => void): Recolhivel {
+  const id = `recolhivel-${++contadorRecolhivel}`;
+  const interno = h("div", { class: "recolhivel__interno" }, conteudo);
+  const painel = h("div", { class: "recolhivel", id, "data-aberto": "false" }, interno);
+  painel.inert = true;
+
+  const texto = h("span", { class: "btn-alternar__texto" }, rotuloAbrir);
+  const botao = h(
+    "button",
+    { class: "btn btn--sm btn-alternar", type: "button", "aria-expanded": "false", "aria-controls": id },
+    h("span", { class: "btn-alternar__icone", "aria-hidden": "true" }),
+    texto,
+  ) as HTMLButtonElement;
+
+  const definir = (abrir: boolean): void => {
+    painel.dataset.aberto = String(abrir);
+    painel.inert = !abrir;
+    botao.setAttribute("aria-expanded", String(abrir));
+    botao.classList.toggle("btn-alternar--aberto", abrir);
+    texto.textContent = abrir ? "Recolher" : rotuloAbrir;
+    if (abrir) {
+      aoAbrir?.();
+      window.setTimeout(() => painel.querySelector<HTMLElement>("input:not([type=hidden]):not([type=radio]):not([type=checkbox]), textarea")?.focus(), 220);
+    }
+  };
+  botao.addEventListener("click", () => definir(painel.dataset.aberto !== "true"));
+  // Esc recolhe quando o foco está dentro do painel
+  painel.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape") {
+      definir(false);
+      botao.focus();
+    }
+  });
+
+  return { painel, botao, abrir: () => definir(true), fechar: () => definir(false), aberto: () => painel.dataset.aberto === "true" };
+}
