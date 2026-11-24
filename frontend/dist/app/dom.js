@@ -70,8 +70,10 @@ export function campo(o) {
     else {
         controle = h("input", { ...comuns, type: o.tipo ?? "text", value: valor });
     }
-    return h("label", { class: "campo" }, h("span", { class: "campo__rotulo" }, o.rotulo, o.obrigatorio && h("span", { class: "campo__obrig", "aria-hidden": "true" }, " *")), controle, o.ajuda && h("span", { class: "campo__ajuda" }, o.ajuda));
+    return h("label", { class: o.colunas ? `campo col-${o.colunas}` : "campo" }, h("span", { class: "campo__rotulo" }, o.rotulo, o.obrigatorio && h("span", { class: "campo__obrig", "aria-hidden": "true" }, " *")), controle, o.ajuda && h("span", { class: "campo__ajuda" }, o.ajuda));
 }
+/** Grupo de campos com título, alinhado ao grid de 12 colunas. */
+export const grupoCampos = (titulo, ...campos) => h("fieldset", { class: "form__grupo" }, h("legend", { class: "form__secao" }, titulo), campos);
 /**
  * Trata o envio do formulário: bloqueia os botões para evitar envio duplo, mostra o estado
  * de espera e exibe os erros da API dentro do próprio formulário, sem perder o que foi digitado.

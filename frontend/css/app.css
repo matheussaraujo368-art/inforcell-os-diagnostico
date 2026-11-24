@@ -874,6 +874,18 @@ a.lista-status__link:hover { background: var(--surface-2); }
 .form--grade > .campo { grid-column: span 3; }
 .form--grade > .campo:has(textarea) { grid-column: span 6; }
 
+/* Grupo de campos no grid: cada campo diz quantas colunas ocupa com .col-N */
+.form__grupo {
+  display: grid;
+  grid-template-columns: repeat(var(--colunas), minmax(0, 1fr));
+  gap: 14px var(--calha);
+  min-width: 0; margin: 0; padding: 0; border: 0;
+}
+.form__grupo > * { min-width: 0; }
+.form__grupo > .form__secao { margin: 0 0 8px; padding: 0; font-weight: 500; }
+.form--grade > .form__grupo { row-gap: 14px; }
+@media (max-width: 720px) { .form__grupo > .campo { grid-column: 1 / -1; } }
+
 /* O painel de status vira uma faixa sem moldura para os cartões caírem nas colunas da página */
 .painel.painel--status { padding: 0; background: transparent; border: 0; box-shadow: none; }
 
@@ -1097,7 +1109,8 @@ a.lista-status__link:hover { background: var(--surface-2); }
 .inicio__passo--proximo { border-color: var(--warn); background: rgba(245, 165, 36, 0.08); }
 .inicio__passo--proximo .inicio__passo-icone { color: var(--warn); background: rgba(245, 165, 36, 0.15); border-color: var(--warn); }
 
-.inicio__kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--calha, 24px); margin-bottom: 28px; }
+.inicio__kpis { display: grid; grid-template-columns: repeat(var(--colunas), minmax(0, 1fr)); gap: var(--calha); margin-bottom: 28px; }
+.inicio__kpis > * { grid-column: span 3; min-width: 0; }
 .inicio__kpi {
   position: relative; display: flex; gap: 14px; align-items: center; padding: 20px 22px; border-radius: 14px;
   background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--border);
@@ -1119,7 +1132,8 @@ a.inicio__kpi--alerta:hover { border-color: #ff6b6b; }
 
 @media (max-width: 980px) {
   .inicio__config { grid-template-columns: 1fr; }
-  .inicio__passos, .inicio__kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .inicio__passos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .inicio__kpis > * { grid-column: span 6; }
 }
 @media (max-width: 520px) {
   .inicio__passos { grid-template-columns: 1fr; }

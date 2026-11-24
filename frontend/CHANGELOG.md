@@ -1,5 +1,15 @@
 # Histórico de versões — Front-end FIXBOT.AI
 
+## [0.4.0] — 24/11/2026
+### Adicionado
+- Novo visual de todas as telas internas: login e cadastro da assistência, painel, Nova OS, Clientes e Equipe.
+- Grid de 12 colunas em todas as telas e na página inicial; Alt+G mostra as colunas.
+- Agente de diagnóstico com consultas ao histórico, orçamento sugerido, mensagem ao cliente e análise de foto.
+- Assistente IA (conversa livre) e tela Configurações, com a chave da IA por empresa.
+
+### Alterado
+- Cadastro do cliente: os dados fiscais (nome e CPF) vêm antes do contato (telefone, e-mail e endereço), no cadastro, na edição e na consulta.
+
 ## [0.3.0] — 04/11/2026
 ### Adicionado
 - Cadastro público de assistências: cada empresa cria a própria conta e vê apenas os próprios dados.

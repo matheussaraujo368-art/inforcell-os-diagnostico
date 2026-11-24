@@ -86,6 +86,8 @@ export interface OpcoesCampo {
   ajuda?: string;
   opcoes?: { valor: string; rotulo: string }[];
   linhas?: number;
+  /** Quantas das 12 colunas do grid o campo ocupa dentro de um grupo (ver grupoCampos). */
+  colunas?: number;
   atributos?: Props;
 }
 
@@ -104,7 +106,7 @@ export function campo(o: OpcoesCampo): HTMLLabelElement {
   }
   return h(
     "label",
-    { class: "campo" },
+    { class: o.colunas ? `campo col-${o.colunas}` : "campo" },
     h("span", { class: "campo__rotulo" }, o.rotulo, o.obrigatorio && h("span", { class: "campo__obrig", "aria-hidden": "true" }, " *")),
     controle,
     o.ajuda && h("span", { class: "campo__ajuda" }, o.ajuda),
@@ -112,6 +114,10 @@ export function campo(o: OpcoesCampo): HTMLLabelElement {
 }
 
 export type Dados = Record<string, string>;
+
+/** Grupo de campos com título, alinhado ao grid de 12 colunas. */
+export const grupoCampos = (titulo: string, ...campos: HTMLElement[]): HTMLElement =>
+  h("fieldset", { class: "form__grupo" }, h("legend", { class: "form__secao" }, titulo), campos);
 
 /**
  * Trata o envio do formulário: bloqueia os botões para evitar envio duplo, mostra o estado

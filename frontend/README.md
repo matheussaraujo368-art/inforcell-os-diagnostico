@@ -53,6 +53,8 @@ Precisam da API do back-end em execução (veja o README do back-end). Com a API
 | Equipe | Adiciona, desativa e reativa atendentes, técnicos e administradores | ADMIN |
 | Clientes | Busca, cadastro e edição de clientes e de seus equipamentos | Cadastro: ADMIN e ATENDENTE |
 | Ordens de Serviço | Lista com filtros, abertura de OS, técnico, orçamento, status, reparos, histórico e comprovante | Abertura: ADMIN e ATENDENTE |
+| Assistente IA | Conversa livre com a IA, com foto, vídeo, ditado e leitura em voz alta | Todos |
+| Configurações | Chave e modelo da IA da empresa | ADMIN |
 | Assistente de diagnóstico | Conversa guiada com a IA, medições e conclusão do diagnóstico | ADMIN e TECNICO |
 
 **URL da API:** o padrão é `http://localhost:3333/api`, definido na `<meta name="inforcell-api">` do `app.html`. Cada navegador pode trocá-la na tela de login, em *Configurar conexão com a API* (fica salva no `localStorage`).
@@ -88,6 +90,9 @@ Todas as telas (página inicial e sistema) seguem um grid de **12 colunas** com 
 | Layout | Colunas (computador) |
 |---|---|
 | Formulário + resumo (Nova OS, Clientes, Equipe), detalhe da OS, diagnóstico, Configurações | 8 + 4 |
+| Cadastro do cliente: Nome + CPF (dados fiscais) | 8 + 4 |
+| Cadastro do cliente: Telefone + E-mail, Endereço (contato) | 4 + 8, 12 |
+| Login e cadastro da assistência (vitrine + cartão) | 6 + 5 (1 livre) |
 | Cartões do painel e indicadores | 3 + 3 + 3 + 3 |
 | Contadores de perfil, escolha de perfil, recursos e planos da página inicial | 4 + 4 + 4 |
 | Assistente IA (conversas + chat) | 3 + 9 |

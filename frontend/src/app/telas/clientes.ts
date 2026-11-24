@@ -1,6 +1,6 @@
 /** HU02 — Clientes e seus equipamentos. */
 import { api, Cliente, ClienteDetalhe, Equipamento, Pagina, pode, TipoEquipamento } from "../api.js";
-import { aoEnviar, cabecalhoTela, caixaOk, campo, data, Dados, h, numeroOS, ocupado, ouNulo, paginador, preencher, tagStatus } from "../dom.js";
+import { aoEnviar, cabecalhoTela, caixaOk, campo, data, Dados, grupoCampos, h, numeroOS, ocupado, ouNulo, paginador, preencher, tagStatus } from "../dom.js";
 import { comMascara, etapaForm, painelRecolhivel, Recolhivel, formatarCpf, formatarTelefone, iconeAparelho, iconeBusca, iniciais, linkWhatsApp, rotuloObrig } from "../componentes.js";
 import { definirAviso, hashComFiltros, irPara } from "../nav.js";
 import type { ContextoTela } from "../main.js";
@@ -23,11 +23,17 @@ function formCliente(atual: Cliente | null, salvar: (d: Dados) => Promise<void>)
   const form = h(
     "form",
     { class: "form form--grade" },
-    campo({ rotulo: "Nome", nome: "nome", valor: atual?.nome, obrigatorio: true, atributos: { minlength: 2, maxlength: 120 } }),
-    campo({ rotulo: "Telefone", nome: "telefone", tipo: "tel", valor: atual?.telefone, obrigatorio: true, ajuda: "Com DDD: 10 ou 11 dígitos." }),
-    campo({ rotulo: "CPF", nome: "cpf", valor: atual?.cpf, ajuda: "Opcional: 11 dígitos." }),
-    campo({ rotulo: "E-mail", nome: "email", tipo: "email", valor: atual?.email }),
-    campo({ rotulo: "Endereço", nome: "endereco", valor: atual?.endereco, atributos: { maxlength: 255 } }),
+    grupoCampos(
+      "Dados fiscais",
+      campo({ rotulo: "Nome", nome: "nome", valor: atual?.nome, obrigatorio: true, colunas: 8, atributos: { minlength: 2, maxlength: 120 } }),
+      campo({ rotulo: "CPF", nome: "cpf", valor: atual?.cpf, colunas: 4, ajuda: "Opcional: 11 dígitos." }),
+    ),
+    grupoCampos(
+      "Contato",
+      campo({ rotulo: "Telefone", nome: "telefone", tipo: "tel", valor: atual?.telefone, obrigatorio: true, colunas: 4, ajuda: "Com DDD: 10 ou 11 dígitos." }),
+      campo({ rotulo: "E-mail", nome: "email", tipo: "email", valor: atual?.email, colunas: 8 }),
+      campo({ rotulo: "Endereço", nome: "endereco", valor: atual?.endereco, colunas: 12, atributos: { maxlength: 255 } }),
+    ),
     h("div", { class: "form__acoes" }, h("button", { class: "btn btn--primary btn--sm", type: "submit" }, "Salvar cliente")),
   );
   const tel = form.querySelector<HTMLInputElement>('input[name="telefone"]');
@@ -54,19 +60,24 @@ function formEquipamento(atual: Equipamento | null, salvar: (d: Dados) => Promis
   const form = h(
     "form",
     { class: "form form--grade" },
-    campo({ rotulo: "Tipo", nome: "tipo", valor: atual?.tipo ?? "CELULAR", obrigatorio: true, opcoes: TIPOS }),
-    campo({ rotulo: "Marca", nome: "marca", valor: atual?.marca, obrigatorio: true, atributos: { maxlength: 60 } }),
-    campo({ rotulo: "Modelo", nome: "modelo", valor: atual?.modelo, obrigatorio: true, atributos: { maxlength: 80 } }),
-    campo({
-      rotulo: "IMEI",
-      nome: "imei",
-      valor: atual?.imei,
-      ajuda: "De 14 a 16 dígitos, sem espaços.",
-      atributos: { inputmode: "numeric", pattern: "\\d{14,16}", title: "De 14 a 16 dígitos, sem espaços" },
-    }),
-    campo({ rotulo: "Nº de série", nome: "numeroSerie", valor: atual?.numeroSerie, atributos: { maxlength: 80 } }),
-    campo({ rotulo: "Cor", nome: "cor", valor: atual?.cor, atributos: { maxlength: 40 } }),
-    campo({ rotulo: "Observações", nome: "observacoes", valor: atual?.observacoes, linhas: 2 }),
+    h(
+      "div",
+      { class: "form__grupo" },
+      campo({ rotulo: "Tipo", nome: "tipo", valor: atual?.tipo ?? "CELULAR", obrigatorio: true, colunas: 3, opcoes: TIPOS }),
+      campo({ rotulo: "Marca", nome: "marca", valor: atual?.marca, obrigatorio: true, colunas: 3, atributos: { maxlength: 60 } }),
+      campo({ rotulo: "Modelo", nome: "modelo", valor: atual?.modelo, obrigatorio: true, colunas: 6, atributos: { maxlength: 80 } }),
+      campo({
+        rotulo: "IMEI",
+        nome: "imei",
+        valor: atual?.imei,
+        colunas: 4,
+        ajuda: "De 14 a 16 dígitos, sem espaços.",
+        atributos: { inputmode: "numeric", pattern: "\\d{14,16}", title: "De 14 a 16 dígitos, sem espaços" },
+      }),
+      campo({ rotulo: "Nº de série", nome: "numeroSerie", valor: atual?.numeroSerie, colunas: 4, atributos: { maxlength: 80 } }),
+      campo({ rotulo: "Cor", nome: "cor", valor: atual?.cor, colunas: 4, atributos: { maxlength: 40 } }),
+      campo({ rotulo: "Observações", nome: "observacoes", valor: atual?.observacoes, colunas: 12, linhas: 2 }),
+    ),
     h("div", { class: "form__acoes" }, h("button", { class: "btn btn--primary btn--sm", type: "submit" }, "Salvar equipamento")),
   );
   aoEnviar(form, salvar);
@@ -165,7 +176,7 @@ function estadoVazio(termo: string): HTMLElement {
   );
 }
 
-/** Formulário em etapas: dados do cliente + aparelho (opcional) + resumo com as ações. */
+/** Formulário em etapas: dados fiscais, contato e aparelho (opcional) + resumo com as ações. */
 function formNovoCliente(fechar: () => void): HTMLElement {
   const nome = h("input", { name: "nome", required: true, minlength: 2, maxlength: 120, placeholder: "Nome completo", autocomplete: "off" }) as HTMLInputElement;
   const telefone = comMascara(h("input", { name: "telefone", type: "tel", required: true, inputmode: "numeric", placeholder: "(99) 99999-9999" }) as HTMLInputElement, formatarTelefone);
@@ -174,14 +185,25 @@ function formNovoCliente(fechar: () => void): HTMLElement {
   const endereco = h("input", { name: "endereco", maxlength: 255, placeholder: "Rua, número, bairro" }) as HTMLInputElement;
 
   const rotulo = (texto: string, obrig = false): HTMLElement => (obrig ? rotuloObrig(texto) : h("span", { class: "campo__rotulo" }, texto));
-  const etapaDados = etapaForm(
+  const etapaFiscal = etapaForm(
     1,
-    "Dados do cliente",
-    "Nome e telefone são obrigatórios. O telefone é usado no WhatsApp.",
+    "Dados fiscais",
+    "Identificação do cliente. O CPF é opcional.",
     null,
-    h("label", { class: "campo" }, rotulo("Nome", true), nome),
-    h("div", { class: "grade-2" }, h("label", { class: "campo" }, rotulo("Telefone (WhatsApp)", true), telefone), h("label", { class: "campo" }, rotulo("CPF"), cpf)),
-    h("div", { class: "grade-2" }, h("label", { class: "campo" }, rotulo("E-mail"), email), h("label", { class: "campo" }, rotulo("Endereço"), endereco)),
+    h("div", { class: "form__grupo" }, h("label", { class: "campo col-8" }, rotulo("Nome", true), nome), h("label", { class: "campo col-4" }, rotulo("CPF"), cpf)),
+  );
+  const etapaContato = etapaForm(
+    2,
+    "Contato",
+    "O telefone é obrigatório e é usado no WhatsApp.",
+    null,
+    h(
+      "div",
+      { class: "form__grupo" },
+      h("label", { class: "campo col-4" }, rotulo("Telefone (WhatsApp)", true), telefone),
+      h("label", { class: "campo col-8" }, rotulo("E-mail"), email),
+      h("label", { class: "campo col-12" }, rotulo("Endereço"), endereco),
+    ),
   );
 
   // ----- Aparelho (opcional) -----
@@ -220,7 +242,7 @@ function formNovoCliente(fechar: () => void): HTMLElement {
   };
   comAparelho.addEventListener("change", atualizarAparelho);
   const etapaAparelho = etapaForm(
-    2,
+    3,
     "Aparelho",
     "Já cadastre o aparelho que chegou para conserto.",
     h("label", { class: "interruptor" }, comAparelho, h("span", { class: "interruptor__trilho", "aria-hidden": "true" }), h("span", {}, "Cadastrar agora")),
@@ -233,6 +255,7 @@ function formNovoCliente(fechar: () => void): HTMLElement {
     return { dd, itens: [h("dt", {}, r), dd] };
   };
   const rNome = linha("Cliente");
+  const rCpf = linha("CPF");
   const rTel = linha("Telefone");
   const rApar = linha("Aparelho");
   const avatar = h("span", { class: "avatar avatar--grande", "aria-hidden": "true" }, "?");
@@ -243,6 +266,7 @@ function formNovoCliente(fechar: () => void): HTMLElement {
   const atualizarResumo = (): void => {
     rNome.dd.textContent = nome.value.trim() || "—";
     avatar.textContent = nome.value.trim() ? iniciais(nome.value) : "?";
+    rCpf.dd.textContent = cpf.value || "—";
     rTel.dd.textContent = telefone.value || "—";
     const ap = [marca.value.trim(), modelo.value.trim()].filter(Boolean).join(" ");
     rApar.dd.textContent = comAparelho.checked ? ap || "—" : "Cadastrar depois";
@@ -251,12 +275,12 @@ function formNovoCliente(fechar: () => void): HTMLElement {
   const form = h(
     "form",
     { class: "nova-os" },
-    h("div", { class: "nova-os__etapas" }, etapaDados, etapaAparelho),
+    h("div", { class: "nova-os__etapas" }, etapaFiscal, etapaContato, etapaAparelho),
     h(
       "aside",
       { class: "resumo-os", "aria-label": "Resumo do cadastro" },
       h("div", { class: "resumo__cabeca" }, avatar, h("h2", {}, "Novo cliente")),
-      h("dl", { class: "resumo__lista" }, rNome.itens, rTel.itens, rApar.itens),
+      h("dl", { class: "resumo__lista" }, rNome.itens, rCpf.itens, rTel.itens, rApar.itens),
       botaoOS,
       botaoSalvar,
       h("button", { class: "btn btn--sm btn--fantasma btn--block", type: "button", onClick: fechar }, "Cancelar"),
@@ -332,8 +356,8 @@ export async function telaCliente(el: HTMLElement, { params }: ContextoTela): Pr
           : h(
               "dl",
               { class: "dados" },
-              h("dt", {}, "Telefone"), h("dd", {}, c.telefone),
-              h("dt", {}, "CPF"), h("dd", {}, c.cpf ?? "—"),
+              h("dt", {}, "CPF"), h("dd", {}, c.cpf ? formatarCpf(c.cpf) : "—"),
+              h("dt", {}, "Telefone"), h("dd", {}, formatarTelefone(c.telefone)),
               h("dt", {}, "E-mail"), h("dd", {}, c.email ?? "—"),
               h("dt", {}, "Endereço"), h("dd", {}, c.endereco ?? "—"),
             ),
