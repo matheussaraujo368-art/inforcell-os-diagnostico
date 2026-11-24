@@ -13,7 +13,7 @@ dashboardRoutes.get("/", async (req, res) => {
   const escopo = u.perfil === "TECNICO" ? { empresaId: u.empresaId, tecnicoId: u.id } : { empresaId: u.empresaId };
   const trintaDias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  const [porStatus, atrasadas, abertas30, finalizadas30, porTecnico] = await Promise.all([
+  const [porStatus, atrasadas, abertas30, finalizadas30, porTecnico, faturamento, totalUsuarios] = await Promise.all([
     prisma.ordemServico.groupBy({ by: ["status"], where: escopo, _count: { _all: true } }),
     prisma.ordemServico.count({ where: { ...escopo, status: { in: ABERTAS }, previsaoEntrega: { lt: new Date() } } }),
     prisma.ordemServico.count({ where: { ...escopo, createdAt: { gte: trintaDias } } }),
@@ -25,6 +25,15 @@ dashboardRoutes.get("/", async (req, res) => {
           where: { empresaId: u.empresaId, status: { in: ABERTAS } },
           _count: { _all: true },
         }),
+    // Faturamento: soma do valor final dos reparos das OS finalizadas nos últimos 30 dias
+    // (mesmo cálculo do comprovante; não é mostrado ao técnico)
+    u.perfil === "TECNICO"
+      ? Promise.resolve(null)
+      : prisma.reparo.aggregate({
+          where: { os: { empresaId: u.empresaId, finalizadaEm: { gte: trintaDias }, status: { not: "CANCELADO" } } },
+          _sum: { valorFinal: true },
+        }),
+    prisma.usuario.count({ where: { empresaId: u.empresaId, ativo: true } }),
   ]);
 
   const tecnicos = await prisma.usuario.findMany({
@@ -39,7 +48,12 @@ dashboardRoutes.get("/", async (req, res) => {
     porStatus: contagem,
     emAberto: ABERTAS.reduce((s, st) => s + contagem[st], 0),
     atrasadas,
-    ultimos30Dias: { abertas: abertas30, finalizadas: finalizadas30 },
+    ultimos30Dias: {
+      abertas: abertas30,
+      finalizadas: finalizadas30,
+      faturado: faturamento ? Number(faturamento._sum?.valorFinal ?? 0) : null,
+    },
+    totalUsuarios,
     abertasPorTecnico: porTecnico.map((t) => ({
       tecnicoId: t.tecnicoId,
       nome: t.tecnicoId ? tecnicos.find((x) => x.id === t.tecnicoId)?.nome ?? "—" : "Sem técnico",

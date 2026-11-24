@@ -37,7 +37,10 @@ export interface Painel {
   porStatus: Record<StatusOS, number>;
   emAberto: number;
   atrasadas: number;
-  ultimos30Dias: { abertas: number; finalizadas: number };
+  /** faturado: soma do valor final das OS finalizadas em 30 dias (null para técnico). */
+  ultimos30Dias: { abertas: number; finalizadas: number; faturado?: number | null };
+  /** Quantas pessoas a empresa tem cadastradas (para a configuração inicial). */
+  totalUsuarios?: number;
   abertasPorTecnico: { tecnicoId: number | null; nome: string; quantidade: number }[];
 }
 
