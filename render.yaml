@@ -6,7 +6,9 @@ services:
     runtime: node
     plan: free
     region: virginia
-    branch: main
+    # O Render publica a partir do fork de Matheus, por esta branch. Só troque para "main"
+    # depois de ligar o serviço a um repositório em que a main esteja atualizada.
+    branch: feature/publicacao
     buildCommand: cd backend && npm ci --include=dev && npx prisma generate && npm run build
     startCommand: cd backend && npx prisma migrate deploy && npm start
     healthCheckPath: /api/health
@@ -19,6 +21,9 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 8h
+      # Criptografa as chaves de IA das empresas. Não mude depois: as chaves salvas ficariam ilegíveis.
+      - key: CHAVE_CRIPTOGRAFIA
+        generateValue: true
       - key: DATABASE_URL
         sync: false
       - key: CORS_ORIGIN
